@@ -1,0 +1,488 @@
+--[[
+    Phoenix Hub (Ste Edition) – Universal Bypass
+    Features: Speed Hack, Hitbox, ESP, Aimbot, Anti-TP, AI Security Monitor
+    Compatible with Delta (no spawn/delay, uses coroutines & RunService timers)
+    الجزء الأول
+]]
+
+local TweenService = game:GetService("TweenService")
+local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local HttpService = game:GetService("HttpService")
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local pGui = player:WaitForChild("PlayerGui")
+
+local ESP_ID = "PHX_" .. HttpService:GenerateGUID(false):sub(1, 8)
+local HITBOX_ATTR = "PHX_Hitboxed"
+
+-- حماية
+pcall(function()
+    if hookmetamethod and setfflag then
+        setfflag("HumanoidParallelCharacterRootPartUpdate", "False")
+        setfflag("RunServiceHeartbeatFix", "True")
+        local oldIndex
+        oldIndex = hookmetamethod(game, "__index", function(self, key)
+            if not checkcaller() and (self == camera or self == player) and (key == "CFrame" or key == "Character") then
+                return oldIndex(self, key)
+            end
+            if not checkcaller() and self:IsA("Humanoid") and key == "WalkSpeed" then
+                return 16
+            end
+            return oldIndex(self, key)
+        end)
+    end
+end)
+
+-- إنترو (بدون spawn/delay)
+local function runIntro()
+    local blur = Instance.new("BlurEffect", Lighting); blur.Size = 24
+    local screenGui = Instance.new("ScreenGui", pGui); screenGui.IgnoreGuiInset = true
+    local blackFrame = Instance.new("Frame", screenGui); blackFrame.Size = UDim2.new(1, 0, 1, 0); blackFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0); blackFrame.ZIndex = 100
+    local introLabel = Instance.new("TextLabel", screenGui); introLabel.Size = UDim2.new(0.8, 0, 0.2, 0); introLabel.Position = UDim2.new(0.1, 0, 0.4, 0); introLabel.BackgroundTransparency = 1; introLabel.TextColor3 = Color3.fromRGB(255, 215, 0); introLabel.Font = Enum.Font.Code; introLabel.TextSize = 20; introLabel.ZIndex = 101
+
+    coroutine.wrap(function()
+        for i = 1, 25 do introLabel.Text = "Loading" .. string.rep(".", i % 4); wait(0.04) end
+        wait(0.5)
+        TweenService:Create(blackFrame, TweenInfo.new(1), {BackgroundTransparency = 1}):Play()
+        TweenService:Create(blur, TweenInfo.new(1), {Size = 0}):Play()
+        wait(1); screenGui:Destroy(); blur:Destroy()
+    end)()
+end
+runIntro()
+if camera.FieldOfView ~= 70 then camera.FieldOfView = 70 end
+
+-- القائمة الرئيسية
+local mainGui = Instance.new("ScreenGui", pGui)
+mainGui.Name = "Phoenix_Stealth"; mainGui.ResetOnSpawn = false; mainGui.IgnoreGuiInset = true
+
+local mainFrame = Instance.new("Frame", mainGui)
+mainFrame.Size = UDim2.new(0, 420, 0, 380)
+mainFrame.Position = UDim2.new(0.5, -210, 0.5, -190)
+mainFrame.BackgroundTransparency = 1
+mainFrame.Visible = false
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
+mainFrame.ZIndex = 1
+
+Instance.new("UIStroke", mainFrame).Color = Color3.fromRGB(255, 200, 0)
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 4)
+
+local bgImage = Instance.new("ImageLabel", mainFrame)
+bgImage.Size = UDim2.new(1, 0, 1, 0)
+bgImage.BackgroundTransparency = 1
+bgImage.Image = "rbxassetid://75160743542605"
+bgImage.ScaleType = Enum.ScaleType.Crop
+bgImage.ZIndex = 0
+Instance.new("UICorner", bgImage).CornerRadius = UDim.new(0, 4)
+
+local header = Instance.new("Frame", mainFrame)
+header.Size = UDim2.new(1, 0, 0, 45)
+header.BackgroundColor3 = Color3.fromRGB(20,20,25)
+header.BackgroundTransparency = 0.3
+header.BorderSizePixel = 0
+header.ZIndex = 5
+Instance.new("UICorner", header).CornerRadius = UDim.new(0, 4)
+
+local title = Instance.new("TextLabel", header)
+title.Size = UDim2.new(0, 200, 1, 0)
+title.Position = UDim2.new(0.5, -100, 0, 0)
+title.Text = "🔥 PHOENIX HUB"
+title.TextColor3 = Color3.fromRGB(255, 200, 0)
+title.Font = Enum.Font.GothamBlack
+title.TextSize = 20
+title.BackgroundTransparency = 1
+
+-- التبويبات
+local tabContainer = Instance.new("Frame", mainFrame)
+tabContainer.Size = UDim2.new(1, 0, 0, 45)
+tabContainer.Position = UDim2.new(0, 0, 0, 45)
+tabContainer.BackgroundTransparency = 1
+tabContainer.ZIndex = 5
+
+local pages = {}
+local function createTab(name, pos, pageName)
+    local btn = Instance.new("TextButton", tabContainer)
+    btn.Size = UDim2.new(0.2, -6, 1, -8)
+    btn.Position = pos + UDim2.new(0, 3, 0, 4)
+    btn.Text = name
+    btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    btn.BackgroundTransparency = 0.5
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 12
+    btn.BorderSizePixel = 0
+    btn.ZIndex = 6
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Thickness = 1.2
+
+    local pg = Instance.new("ScrollingFrame", mainFrame)
+    pg.Size = UDim2.new(1, -20, 0, 270)
+    pg.Position = UDim2.new(0, 10, 0, 95)
+    pg.BackgroundTransparency = 1
+    pg.ScrollBarThickness = 2
+    pg.ScrollBarImageColor3 = Color3.fromRGB(255,200,0)
+    pg.Visible = (name == "MAIN")
+    pg.ZIndex = 5
+    pages[pageName] = pg
+
+    btn.MouseButton1Click:Connect(function()
+        for _, p in pairs(pages) do p.Visible = false end
+        pg.Visible = true
+    end)
+end
+
+createTab("MAIN", UDim2.new(0, 0, 0, 0), "main")
+createTab("HITBOX", UDim2.new(0.2, 0, 0, 0), "hitbox")
+createTab("VISUALS", UDim2.new(0.4, 0, 0, 0), "visuals")
+createTab("AIMBOT", UDim2.new(0.6, 0, 0, 0), "aimbot")
+createTab("AI", UDim2.new(0.8, 0, 0, 0), "ai")
+
+local settings = {
+    speedEnabled = false, speedValue = 24,
+    hbSize = 12, hbEnabled = false,
+    espEnabled = false,
+    aimbotEnabled = false, aimSmoothness = 0.15, aimFOV = 200, aimOffsetX = 0, aimOffsetY = 0,
+    antiTPEnabled = false
+}
+
+-- دوال الأزرار
+local function addToggle(parent, text, callback)
+    local btn = Instance.new("TextButton", parent)
+    btn.Size = UDim2.new(0.9, 0, 0, 42)
+    btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    btn.BackgroundTransparency = 0.5
+    btn.Text = text .. " ❌"
+    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    btn.Font = Enum.Font.GothamBold
+    btn.BorderSizePixel = 0
+    btn.ZIndex = 6
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    local stroke = Instance.new("UIStroke", btn)
+    stroke.Color = Color3.fromRGB(255, 255, 255)
+    stroke.Thickness = 1.2
+    btn.Position = UDim2.new(0.05, 0, 0, #parent:GetChildren() * 50)
+
+    local active = false
+    btn.MouseButton1Click:Connect(function()
+        active = not active
+        if active then
+            btn.Text = text .. " ✅"
+            stroke.Color = Color3.fromRGB(255, 200, 0)
+        else
+            btn.Text = text .. " ❌"
+            stroke.Color = Color3.fromRGB(255, 255, 255)
+        end
+        callback(active)
+    end)
+end
+
+local function addInput(parent, label, placeholder, callback)
+    local frame = Instance.new("Frame", parent)
+    frame.Size = UDim2.new(0.9, 0, 0, 42)
+    frame.BackgroundTransparency = 1
+    frame.ZIndex = 6
+    frame.Position = UDim2.new(0.05, 0, 0, #parent:GetChildren() * 50)
+
+    local txt = Instance.new("TextLabel", frame)
+    txt.Size = UDim2.new(0.5, 0, 1, 0)
+    txt.Text = label
+    txt.TextColor3 = Color3.fromRGB(200, 200, 200)
+    txt.BackgroundTransparency = 1
+    txt.Font = Enum.Font.GothamBold
+    txt.TextXAlignment = "Left"
+
+    local box = Instance.new("TextBox", frame)
+    box.Size = UDim2.new(0.45, 0, 0.8, 0)
+    box.Position = UDim2.new(0.55, 0, 0.1, 0)
+    box.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    box.BackgroundTransparency = 0.5
+    box.TextColor3 = Color3.fromRGB(0, 0, 0)
+    box.Text = placeholder
+    box.Font = Enum.Font.Code
+    box.BorderSizePixel = 0
+    box.Active = true
+    box.ZIndex = 7
+    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4)
+    Instance.new("UIStroke", box).Color = Color3.fromRGB(255, 255, 255)
+    box.FocusLost:Connect(function()
+        local val = tonumber(box.Text)
+        if val then callback(val) end
+    end)
+end
+
+-- تبويب MAIN
+addInput(pages.main, "Speed:", "24", function(v) settings.speedValue = math.clamp(v,1,200) end)
+addToggle(pages.main, "Speed Hack", function(v) settings.speedEnabled = v end)
+addToggle(pages.main, "Anti-TP (رجوع)", function(v) settings.antiTPEnabled = v end)
+
+-- تبويب HITBOX
+addToggle(pages.hitbox, "Hitbox All", function(v) settings.hbEnabled = v end)
+addInput(pages.hitbox, "Size:", "12", function(v) settings.hbSize = math.clamp(v,1,50) end)
+
+-- تبويب VISUALS
+addToggle(pages.visuals, "ESP (Name/HP)", function(v) settings.espEnabled = v end)
+
+-- تبويب AIMBOT
+addToggle(pages.aimbot, "Aimbot", function(v) settings.aimbotEnabled = v end)
+addInput(pages.aimbot, "Smooth:", "0.15", function(v) settings.aimSmoothness = math.clamp(v,0.01,1) end)
+addInput(pages.aimbot, "FOV:", "200", function(v) settings.aimFOV = v end)
+addInput(pages.aimbot, "Off X:", "0", function(v) settings.aimOffsetX = v end)
+addInput(pages.aimbot, "Off Y:", "0", function(v) settings.aimOffsetY = v end)-- الجزء الثاني
+
+-- تبويب AI (نظام المراقبة الذكية)
+local securityStatus = Instance.new("TextLabel", pages.ai)
+securityStatus.Size = UDim2.new(0.9, 0, 0, 200)
+securityStatus.Position = UDim2.new(0.05, 0, 0, 10)
+securityStatus.BackgroundTransparency = 1
+securityStatus.TextColor3 = Color3.fromRGB(255, 255, 255)
+securityStatus.Font = Enum.Font.GothamBold
+securityStatus.TextSize = 14
+securityStatus.TextXAlignment = "Left"
+securityStatus.TextYAlignment = "Top"
+securityStatus.Text = "جاري الفحص..."
+
+-- إشعار مؤقت (بدون delay)
+local function showNotification(text, color)
+    local notif = Instance.new("TextLabel", mainGui)
+    notif.Size = UDim2.new(0.4, 0, 0, 40)
+    notif.Position = UDim2.new(0.3, 0, 0.02, 0)
+    notif.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    notif.BackgroundTransparency = 0.3
+    notif.TextColor3 = color or Color3.fromRGB(255, 255, 255)
+    notif.Text = text
+    notif.Font = Enum.Font.GothamBold
+    notif.TextSize = 16
+    notif.ZIndex = 10
+    Instance.new("UICorner", notif).CornerRadius = UDim.new(0, 6)
+    -- إزالة بعد 5 ثواني باستخدام RunService
+    local start = tick()
+    local conn
+    conn = RunService.Heartbeat:Connect(function()
+        if tick() - start >= 5 then
+            notif:Destroy()
+            conn:Disconnect()
+        end
+    end)
+end
+
+local function analyzeMap()
+    local warnings = {}
+    local char = player.Character
+    local hum = char and char:FindFirstChild("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+
+    -- 1. تحليل سرعة المشي
+    if hum then
+        local defaultSpeed = 16
+        if hum.WalkSpeed ~= defaultSpeed and not settings.speedEnabled then
+            table.insert(warnings, "⚠️ السرعة الافتراضية متغيرة – قد يكون هناك كشف للسرعة.")
+        end
+    end
+
+    -- 2. تحليل Hitbox
+    if root and not settings.hbEnabled then
+        if root.Size ~= Vector3.new(2,2,1) then
+            table.insert(warnings, "⚠️ حجم الهيت بوكس متغير – قد يكون هناك كشف للهيت بوكس.")
+        end
+    end
+
+    -- 3. ألعاب معروفة بالحماية
+    local placeId = game.PlaceId
+    local knownACGames = {
+        [62845836] = "Arsenal",
+        [6872274481] = "BedWars",
+        [301549746] = "Counter Blox",
+    }
+    if knownACGames[placeId] then
+        table.insert(warnings, "🛡️ هذه اللعبة معروفة بحماية قوية ضد الهاكات.")
+    end
+
+    -- 4. فحص وجود AntiCheat في workspace
+    for _, obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Name:lower():find("anticheat") then
+            table.insert(warnings, "🛡️ تم العثور على أجزاء AntiCheat في الماب.")
+            break
+        end
+    end
+
+    -- عرض النتيجة
+    if #warnings == 0 then
+        securityStatus.Text = "✅ الأمان: لم يتم اكتشاف أي تهديدات.\n\nيمكنك تفعيل الميزات بأمان."
+    else
+        securityStatus.Text = "تحذيرات الأمان:\n\n" .. table.concat(warnings, "\n")
+        showNotification("⚠️ توجد تحذيرات أمان، راجع تبويب AI", Color3.fromRGB(255, 100, 100))
+    end
+end
+
+-- زر فحص يدوي
+local scanButton = Instance.new("TextButton", pages.ai)
+scanButton.Size = UDim2.new(0.9, 0, 0, 40)
+scanButton.Position = UDim2.new(0.05, 0, 0, 220)
+scanButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+scanButton.BackgroundTransparency = 0.5
+scanButton.Text = "🔄 فحص الأمان"
+scanButton.TextColor3 = Color3.fromRGB(200, 200, 200)
+scanButton.Font = Enum.Font.GothamBold
+scanButton.BorderSizePixel = 0
+scanButton.ZIndex = 6
+Instance.new("UICorner", scanButton).CornerRadius = UDim.new(0, 6)
+Instance.new("UIStroke", scanButton).Color = Color3.fromRGB(255, 255, 255)
+scanButton.MouseButton1Click:Connect(analyzeMap)
+
+-- فحص تلقائي كل 10 ثواني (باستخدام RunService)
+local lastScan = 0
+RunService.Heartbeat:Connect(function()
+    if mainFrame.Visible and tick() - lastScan >= 10 then
+        lastScan = tick()
+        analyzeMap()
+    end
+end)
+
+-- زر الفتح (صورة)
+local openBtn = Instance.new("ImageButton", mainGui)
+openBtn.Size = UDim2.new(0, 55, 0, 55)
+openBtn.Position = UDim2.new(0.03, 0, 0.82, 0)
+openBtn.BackgroundTransparency = 1
+openBtn.Image = "rbxassetid://97303487887939"
+openBtn.ScaleType = Enum.ScaleType.Crop
+openBtn.ZIndex = 10
+openBtn.BorderSizePixel = 0
+Instance.new("UICorner", openBtn).CornerRadius = UDim.new(1, 0)
+Instance.new("UIStroke", openBtn).Color = Color3.fromRGB(255,200,0)
+Instance.new("UIStroke", openBtn).Thickness = 2
+
+openBtn.MouseButton1Click:Connect(function() mainFrame.Visible = not mainFrame.Visible end)-- الجزء الثالث
+
+-- الأيم بوت
+local function isVisible(targetPart)
+    if not targetPart then return false end
+    local origin = camera.CFrame.Position; local direction = targetPart.Position - origin
+    if direction.Magnitude < 0.1 then return true end
+    local raycastParams = RaycastParams.new(); raycastParams.FilterType = Enum.RaycastFilterType.Exclude; raycastParams.FilterDescendantsInstances = {player.Character, targetPart.Parent}; raycastParams.IgnoreWater = true
+    return workspace:Raycast(origin, direction, raycastParams) == nil
+end
+
+local mouse = nil pcall(function() mouse = player:GetMouse() end)
+local function getAimPosition()
+    if mouse then return Vector2.new(mouse.X, mouse.Y) + Vector2.new(settings.aimOffsetX, settings.aimOffsetY)
+    else return camera.ViewportSize/2 + Vector2.new(settings.aimOffsetX, settings.aimOffsetY) end
+end
+
+local function getClosestPlayerToMouse()
+    local target, minDist = nil, settings.aimFOV; local aimPos = getAimPosition()
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
+            local hrp = v.Character.HumanoidRootPart; local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
+            if onScreen then
+                local dist = (Vector2.new(pos.X, pos.Y) - aimPos).Magnitude
+                if dist < minDist and isVisible(hrp) then minDist = dist; target = hrp end
+            end
+        end
+    end
+    return target
+end
+
+RunService.RenderStepped:Connect(function()
+    if settings.aimbotEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local tgt = getClosestPlayerToMouse()
+        if tgt then camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, tgt.Position), settings.aimSmoothness) end
+    end
+end)
+
+-- ESP
+local function createESP_UI(targetPlayer)
+    local bgGui = Instance.new("BillboardGui"); bgGui.Name = ESP_ID; bgGui.AlwaysOnTop = true; bgGui.Size = UDim2.new(4.5,0,6,0); bgGui.ResetOnSpawn = true
+    local box = Instance.new("Frame", bgGui); box.Size = UDim2.new(1,0,1,0); box.BackgroundTransparency = 1; Instance.new("UIStroke", box).Color = Color3.fromRGB(255,140,0)
+    local nameLabel = Instance.new("TextLabel", bgGui); nameLabel.Size = UDim2.new(1,0,0.2,0); nameLabel.Position = UDim2.new(0,0,-0.25,0); nameLabel.BackgroundTransparency = 1; nameLabel.TextColor3 = Color3.fromRGB(255,255,255); nameLabel.TextStrokeTransparency = 0; nameLabel.Font = Enum.Font.GothamBold; nameLabel.TextSize = 11; nameLabel.Text = targetPlayer.Name
+    local healthBg = Instance.new("Frame", bgGui); healthBg.Size = UDim2.new(0.1,0,1,0); healthBg.Position = UDim2.new(-0.15,0,0,0); healthBg.BackgroundColor3 = Color3.fromRGB(40,0,0); healthBg.BorderSizePixel = 0
+    local healthBar = Instance.new("Frame", healthBg); healthBar.Size = UDim2.new(1,0,1,0); healthBar.BackgroundColor3 = Color3.fromRGB(0,255,0); healthBar.BorderSizePixel = 0
+    local conn = RunService.Heartbeat:Connect(function()
+        if targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") and bgGui.Parent then
+            local hum = targetPlayer.Character.Humanoid; local ratio = math.clamp(hum.Health/hum.MaxHealth,0,1)
+            healthBar.Size = UDim2.new(1,0,ratio,0); healthBar.Position = UDim2.new(0,0,1-ratio,0)
+            healthBar.BackgroundColor3 = Color3.fromRGB(255,0,0):Lerp(Color3.fromRGB(0,255,0), ratio)
+        else conn:Disconnect() end
+    end)
+    bgGui.Destroying:Connect(function() conn:Disconnect() end)
+    return bgGui
+end
+
+-- Anti-TP
+local lastGroundPos = Vector3.zero; local antiTPButton = nil
+RunService.RenderStepped:Connect(function()
+    pcall(function()
+        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
+            local hum = player.Character.Humanoid
+            if hum.Health > 0 and hum.FloorMaterial ~= Enum.Material.Air then lastGroundPos = player.Character.HumanoidRootPart.Position end
+        end
+    end)
+end)
+
+local antiTPGui = Instance.new("ScreenGui", pGui); antiTPGui.Name = "AntiTPGui"; antiTPGui.IgnoreGuiInset = true; antiTPGui.ResetOnSpawn = false
+
+local function updateAntiTPButton()
+    if settings.antiTPEnabled then
+        if not antiTPButton then
+            local btnFrame = Instance.new("Frame", antiTPGui); btnFrame.Size = UDim2.new(0,75,0,40); btnFrame.Position = UDim2.new(0.82,0,0.88,0); btnFrame.BackgroundColor3 = Color3.fromRGB(200,40,40); btnFrame.BackgroundTransparency = 0.3; btnFrame.Active = true; btnFrame.Draggable = true; btnFrame.ZIndex = 5; btnFrame.BorderSizePixel = 0
+            Instance.new("UICorner", btnFrame).CornerRadius = UDim.new(0,6); Instance.new("UIStroke", btnFrame).Color = Color3.fromRGB(255,200,200)
+            local btnText = Instance.new("TextButton", btnFrame); btnText.Size = UDim2.new(1,0,1,0); btnText.BackgroundTransparency = 1; btnText.Text = "↩️ رجوع"; btnText.TextColor3 = Color3.fromRGB(255,255,255); btnText.Font = Enum.Font.GothamBold; btnText.TextSize = 14; btnText.ZIndex = 5
+            btnText.MouseButton1Click:Connect(function()
+                if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and lastGroundPos ~= Vector3.zero then
+                    player.Character.HumanoidRootPart.CFrame = CFrame.new(lastGroundPos); player.Character.HumanoidRootPart.Velocity = Vector3.zero
+                end
+            end)
+            antiTPButton = btnFrame
+        end
+    else
+        if antiTPButton then antiTPButton:Destroy(); antiTPButton = nil end
+    end
+end
+RunService.RenderStepped:Connect(function() updateAntiTPButton() end)
+
+-- المحرك الرئيسي
+RunService.RenderStepped:Connect(function()
+    pcall(function()
+        if player.Character and player.Character:FindFirstChild("Humanoid") then
+            player.Character.Humanoid.WalkSpeed = settings.speedEnabled and settings.speedValue or 16
+        end
+
+        for _, v in pairs(Players:GetPlayers()) do
+            if v ~= player and v.Character then
+                local hrp = v.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    local humanoid = v.Character:FindFirstChild("Humanoid")
+                    if humanoid and humanoid.Health > 0 then
+                        local canHitbox = (humanoid.SeatPart == nil)
+                        if settings.hbEnabled and canHitbox then
+                            hrp.Size = Vector3.new(settings.hbSize, settings.hbSize, settings.hbSize); hrp.Transparency = 0.8; hrp:SetAttribute(HITBOX_ATTR, true)
+                        else
+                            if hrp:GetAttribute(HITBOX_ATTR) then hrp.Size = Vector3.new(2,2,1); hrp.Transparency = 1; hrp:SetAttribute(HITBOX_ATTR, nil) end
+                        end
+                    else
+                        if hrp:GetAttribute(HITBOX_ATTR) then hrp.Size = Vector3.new(2,2,1); hrp.Transparency = 1; hrp:SetAttribute(HITBOX_ATTR, nil) end
+                    end
+
+                    local esp = hrp:FindFirstChild(ESP_ID)
+                    if settings.espEnabled then
+                        if not esp then createESP_UI(v).Parent = hrp end
+                    elseif esp then esp:Destroy() end
+                end
+            end
+        end
+    end)
+end)
+
+-- أول فحص بعد التحميل (مؤقت بـ RunService)
+local initialScanDone = false
+RunService.Heartbeat:Connect(function()
+    if not initialScanDone and tick() >= 4 then
+        initialScanDone = true
+        mainFrame.Visible = true
+        analyzeMap()
+    end
+end)
