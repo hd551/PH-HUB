@@ -1,7 +1,7 @@
 --[[
     Phoenix Hub (Ste Edition) – Universal Bypass
-    Features: Speed Hack, Hitbox, ESP, Aimbot, Anti-TP, AI Security Monitor
-    Compatible with Delta (no spawn/delay, uses coroutines & RunService timers)
+    Features: Speed Hack, Hitbox, ESP, Aimbot, Anti-TP, Background AI Monitor
+    Compatible with Delta (no task.* / spawn / delay)
     الجزء الأول
 ]]
 
@@ -234,7 +234,7 @@ addInput(pages.aimbot, "FOV:", "200", function(v) settings.aimFOV = v end)
 addInput(pages.aimbot, "Off X:", "0", function(v) settings.aimOffsetX = v end)
 addInput(pages.aimbot, "Off Y:", "0", function(v) settings.aimOffsetY = v end)-- الجزء الثاني
 
--- تبويب AI (نظام المراقبة الذكية)
+-- تبويب AI (نظام المراقبة الذكي - يعمل تلقائياً)
 local securityStatus = Instance.new("TextLabel", pages.ai)
 securityStatus.Size = UDim2.new(0.9, 0, 0, 200)
 securityStatus.Position = UDim2.new(0.05, 0, 0, 10)
@@ -246,7 +246,7 @@ securityStatus.TextXAlignment = "Left"
 securityStatus.TextYAlignment = "Top"
 securityStatus.Text = "جاري الفحص..."
 
--- إشعار مؤقت (بدون delay)
+-- إشعار مؤقت (يظهر تلقائياً عند الحاجة)
 local function showNotification(text, color)
     local notif = Instance.new("TextLabel", mainGui)
     notif.Size = UDim2.new(0.4, 0, 0, 40)
@@ -259,7 +259,7 @@ local function showNotification(text, color)
     notif.TextSize = 16
     notif.ZIndex = 10
     Instance.new("UICorner", notif).CornerRadius = UDim.new(0, 6)
-    -- إزالة بعد 5 ثواني باستخدام RunService
+    -- إزالة بعد 5 ثواني
     local start = tick()
     local conn
     conn = RunService.Heartbeat:Connect(function()
@@ -270,28 +270,28 @@ local function showNotification(text, color)
     end)
 end
 
+-- دالة الفحص الأمني (تشتغل تلقائياً في الخلفية)
 local function analyzeMap()
     local warnings = {}
     local char = player.Character
     local hum = char and char:FindFirstChild("Humanoid")
     local root = char and char:FindFirstChild("HumanoidRootPart")
 
-    -- 1. تحليل سرعة المشي
+    -- 1. سرعة المشي الافتراضية
     if hum then
-        local defaultSpeed = 16
-        if hum.WalkSpeed ~= defaultSpeed and not settings.speedEnabled then
+        if hum.WalkSpeed ~= 16 and not settings.speedEnabled then
             table.insert(warnings, "⚠️ السرعة الافتراضية متغيرة – قد يكون هناك كشف للسرعة.")
         end
     end
 
-    -- 2. تحليل Hitbox
+    -- 2. حجم الهيت بوكس
     if root and not settings.hbEnabled then
         if root.Size ~= Vector3.new(2,2,1) then
             table.insert(warnings, "⚠️ حجم الهيت بوكس متغير – قد يكون هناك كشف للهيت بوكس.")
         end
     end
 
-    -- 3. ألعاب معروفة بالحماية
+    -- 3. ألعاب معروفة بحماية قوية
     local placeId = game.PlaceId
     local knownACGames = {
         [62845836] = "Arsenal",
@@ -302,7 +302,7 @@ local function analyzeMap()
         table.insert(warnings, "🛡️ هذه اللعبة معروفة بحماية قوية ضد الهاكات.")
     end
 
-    -- 4. فحص وجود AntiCheat في workspace
+    -- 4. فحص أجزاء AntiCheat في workspace
     for _, obj in pairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") and obj.Name:lower():find("anticheat") then
             table.insert(warnings, "🛡️ تم العثور على أجزاء AntiCheat في الماب.")
@@ -310,16 +310,17 @@ local function analyzeMap()
         end
     end
 
-    -- عرض النتيجة
+    -- عرض الحالة في التبويب
     if #warnings == 0 then
         securityStatus.Text = "✅ الأمان: لم يتم اكتشاف أي تهديدات.\n\nيمكنك تفعيل الميزات بأمان."
     else
         securityStatus.Text = "تحذيرات الأمان:\n\n" .. table.concat(warnings, "\n")
+        -- إشعار أعلى الشاشة
         showNotification("⚠️ توجد تحذيرات أمان، راجع تبويب AI", Color3.fromRGB(255, 100, 100))
     end
 end
 
--- زر فحص يدوي
+-- زر فحص يدوي (للاحتياط)
 local scanButton = Instance.new("TextButton", pages.ai)
 scanButton.Size = UDim2.new(0.9, 0, 0, 40)
 scanButton.Position = UDim2.new(0.05, 0, 0, 220)
@@ -334,10 +335,10 @@ Instance.new("UICorner", scanButton).CornerRadius = UDim.new(0, 6)
 Instance.new("UIStroke", scanButton).Color = Color3.fromRGB(255, 255, 255)
 scanButton.MouseButton1Click:Connect(analyzeMap)
 
--- فحص تلقائي كل 10 ثواني (باستخدام RunService)
+-- تشغيل الفحص التلقائي كل 10 ثواني في الخلفية (بدون شرط فتح القائمة)
 local lastScan = 0
 RunService.Heartbeat:Connect(function()
-    if mainFrame.Visible and tick() - lastScan >= 10 then
+    if tick() - lastScan >= 10 then
         lastScan = tick()
         analyzeMap()
     end
@@ -477,12 +478,11 @@ RunService.RenderStepped:Connect(function()
     end)
 end)
 
--- أول فحص بعد التحميل (مؤقت بـ RunService)
-local initialScanDone = false
+-- تشغيل القائمة بعد 4 ثواني (أول فحص يتم تلقائياً)
+local initialStartDone = false
 RunService.Heartbeat:Connect(function()
-    if not initialScanDone and tick() >= 4 then
-        initialScanDone = true
+    if not initialStartDone and tick() >= 4 then
+        initialStartDone = true
         mainFrame.Visible = true
-        analyzeMap()
     end
 end)
