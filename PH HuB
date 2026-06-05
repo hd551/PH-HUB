@@ -1,488 +1,559 @@
---[[
-    Phoenix Hub (Ste Edition) – Universal Bypass
-    Features: Speed Hack, Hitbox, ESP, Aimbot, Anti-TP, Background AI Monitor
-    Compatible with Delta (no task.* / spawn / delay)
-    الجزء الأول
-]]
+-- ============================================
+-- Delta Hub Mobile - نسخة محسنة للجوال (الجزء 1/3)
+-- ============================================
 
-local TweenService = game:GetService("TweenService")
-local Lighting = game:GetService("Lighting")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local HttpService = game:GetService("HttpService")
+local Camera = workspace.CurrentCamera
+
 local player = Players.LocalPlayer
-local camera = workspace.CurrentCamera
-local pGui = player:WaitForChild("PlayerGui")
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoid = character:WaitForChild("Humanoid")
+local rootPart = character:WaitForChild("HumanoidRootPart")
 
-local ESP_ID = "PHX_" .. HttpService:GenerateGUID(false):sub(1, 8)
-local HITBOX_ATTR = "PHX_Hitboxed"
+-- متغيرات عامة
+local savedPosition = nil
+local isTeleportActive = false
+local currentSpeed = 16
+local isTeleporting = false
+local ignoredPlayers = {}
+local espEnabled = false
+local espObjects = {}
+local autoAimEnabled = false
+local hitboxEnabled = false
+local hitboxSize = 8
 
--- حماية
-pcall(function()
-    if hookmetamethod and setfflag then
-        setfflag("HumanoidParallelCharacterRootPartUpdate", "False")
-        setfflag("RunServiceHeartbeatFix", "True")
-        local oldIndex
-        oldIndex = hookmetamethod(game, "__index", function(self, key)
-            if not checkcaller() and (self == camera or self == player) and (key == "CFrame" or key == "Character") then
-                return oldIndex(self, key)
+-- إنشاء الواجهة الرئيسية (ستظهر بشكل جميل على الجوال)
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "DeltaMobile"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+-- حاوية ESP (لن تتأثر بحجم الشاشة)
+local espContainer = Instance.new("Frame")
+espContainer.Size = UDim2.new(1, 0, 1, 0)
+espContainer.BackgroundTransparency = 1
+espContainer.Parent = screenGui
+
+print("✅ الجزء الأول تم تحميله بنجاح - انتقل للجزء الثاني")-- ============================================
+-- الجزء 2/3: القائمة الرئيسية بتصميم جوال
+-- ============================================
+
+local mainFrame = Instance.new("Frame")
+mainFrame.Size = UDim2.new(0.9, 0, 0, 0.7) -- 90% عرض الشاشة، 70% ارتفاع
+mainFrame.Position = UDim2.new(0.05, 0, 0.15, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+mainFrame.BackgroundTransparency = 0.1
+mainFrame.Draggable = true
+mainFrame.Active = true
+mainFrame.Visible = true
+mainFrame.Parent = screenGui
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+
+-- شريط عنوان كبير
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1, 0, 0, 50)
+title.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
+title.Text = "⚡ DELTA MOBILE ⚡"
+title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 20
+title.Font = Enum.Font.GothamBold
+title.Parent = mainFrame
+Instance.new("UICorner", title).CornerRadius = UDim.new(0, 12)
+
+-- حاوية الأزرار (ScrollingFrame لأن القائمة طويلة)
+local btnContainer = Instance.new("ScrollingFrame")
+btnContainer.Size = UDim2.new(1, -10, 1, -60)
+btnContainer.Position = UDim2.new(0, 5, 0, 55)
+btnContainer.BackgroundTransparency = 1
+btnContainer.ScrollBarThickness = 5
+btnContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+btnContainer.Parent = mainFrame
+
+-- دالة مساعدة لإنشاء الأزرار بشكل جميل ومناسب للجوال
+local function createBtn(text, yPos, color)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, -10, 0, 55)
+    btn.Position = UDim2.new(0, 5, 0, yPos)
+    btn.BackgroundColor3 = color
+    btn.Text = text
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btn.TextSize = 14
+    btn.Font = Enum.Font.GothamBold
+    btn.Parent = btnContainer
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
+    return btn
+end
+
+-- الأزرار (سنضيف لها وظائف لاحقاً)
+local espBtn = createBtn("🔍 ESP: OFF", 0, Color3.fromRGB(0, 150, 200))
+local ignoreBtn = createBtn("👤 IGNORE PLAYER", 65, Color3.fromRGB(200, 100, 50))
+local hitboxBtn = createBtn("📦 HITBOX: OFF", 130, Color3.fromRGB(150, 50, 150))
+local aimBtn = createBtn("🎯 AUTO AIM: OFF", 195, Color3.fromRGB(255, 80, 80))
+local speedBtn = createBtn("⚡ SPEED: OFF (50)", 260, Color3.fromRGB(100, 150, 255))
+local tpActivateBtn = createBtn("🌀 ACTIVATE TELEPORT", 325, Color3.fromRGB(100, 150, 255))
+local closeBtn = createBtn("✖️ CLOSE MENU", 390, Color3.fromRGB(100, 100, 100))
+
+-- تحديث حجم الـ ScrollingFrame
+btnContainer.CanvasSize = UDim2.new(0, 0, 0, 460)
+
+-- زر فتح القائمة المنفصل (صغير ويمكن تحريكه)
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 60, 0, 60)
+toggleBtn.Position = UDim2.new(0.02, 0, 0.8, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+toggleBtn.Text = "⚡"
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.TextSize = 24
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.Draggable = true
+toggleBtn.Parent = screenGui
+Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
+
+-- زر التلبورت المنفصل (سيظهر عند التفعيل)
+local tpButton = Instance.new("TextButton")
+tpButton.Size = UDim2.new(0, 70, 0, 70)
+tpButton.Position = UDim2.new(0.8, 0, 0.7, 0)
+tpButton.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+tpButton.Text = "🔮\nTP"
+tpButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+tpButton.TextSize = 14
+tpButton.Font = Enum.Font.GothamBold
+tpButton.Visible = false
+tpButton.Draggable = true
+tpButton.Parent = screenGui
+Instance.new("UICorner", tpButton).CornerRadius = UDim.new(1, 0)
+
+print("✅ الجزء الثاني تم تحميله - انتقل للجزء الثالث (الأخير)")-- ============================================
+-- الجزء 3/3: جميع الوظائف (ESP، هيت بوكس، تصويب، تلبورت)
+-- ============================================
+
+-- متغيرات السرعة
+local speedEnabled = false
+local currentSpeedVal = 50
+
+-- وظيفة السرعة
+speedBtn.MouseButton1Click:Connect(function()
+    speedEnabled = not speedEnabled
+    if speedEnabled then
+        speedBtn.Text = "⚡ SPEED: ON (" .. currentSpeedVal .. ")"
+        speedBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        humanoid.WalkSpeed = currentSpeedVal
+    else
+        speedBtn.Text = "⚡ SPEED: OFF (" .. currentSpeedVal .. ")"
+        speedBtn.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+        humanoid.WalkSpeed = 16
+    end
+end)
+
+-- مربع إدخال السرعة (يظهر عند الضغط المطول)
+local speedBox = Instance.new("TextBox")
+speedBox.Size = UDim2.new(0, 150, 0, 40)
+speedBox.Position = UDim2.new(0.5, -75, 0.5, -20)
+speedBox.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+speedBox.Text = "50"
+speedBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedBox.TextSize = 16
+speedBox.Font = Enum.Font.Code
+speedBox.Visible = false
+speedBox.Parent = screenGui
+Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0, 8)
+
+speedBtn.MouseButton2Click:Connect(function() -- الضغط بزر الفأرة الأيمن أو الضغط المطول على الجوال
+    speedBox.Visible = true
+    speedBox:CaptureFocus()
+end)
+speedBox.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local newSpeed = tonumber(speedBox.Text)
+        if newSpeed then
+            currentSpeedVal = newSpeed
+            if speedEnabled then
+                humanoid.WalkSpeed = currentSpeedVal
+                speedBtn.Text = "⚡ SPEED: ON (" .. currentSpeedVal .. ")"
+            else
+                speedBtn.Text = "⚡ SPEED: OFF (" .. currentSpeedVal .. ")"
             end
-            if not checkcaller() and self:IsA("Humanoid") and key == "WalkSpeed" then
-                return 16
+        end
+    end
+    speedBox.Visible = false
+end)
+
+-- ==================== هيت بوكس ====================
+local function applyHitbox(plr)
+    if not hitboxEnabled then return end
+    if plr == player or ignoredPlayers[plr.Name] then return end
+    local char = plr.Character
+    if not char then return end
+    local parts = {char:FindFirstChild("HumanoidRootPart"), char:FindFirstChild("Torso"), char:FindFirstChild("UpperTorso")}
+    for _, part in pairs(parts) do
+        if part then
+            part.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+            part.Transparency = 0.5
+            part.CanCollide = false
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(function()
+    if hitboxEnabled then
+        for _, plr in pairs(Players:GetPlayers()) do
+            pcall(applyHitbox, plr)
+        end
+    end
+end)
+
+hitboxBtn.MouseButton1Click:Connect(function()
+    hitboxEnabled = not hitboxEnabled
+    if hitboxEnabled then
+        hitboxBtn.Text = "📦 HITBOX: ON"
+        hitboxBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    else
+        hitboxBtn.Text = "📦 HITBOX: OFF"
+        hitboxBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 150)
+        for _, plr in pairs(Players:GetPlayers()) do
+            if plr ~= player and plr.Character then
+                local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then hrp.Size = Vector3.new(2, 2, 1) end
+                local torso = plr.Character:FindFirstChild("Torso")
+                if torso then torso.Size = Vector3.new(2, 2, 1) end
+                local utorso = plr.Character:FindFirstChild("UpperTorso")
+                if utorso then utorso.Size = Vector3.new(2, 2, 1) end
             end
-            return oldIndex(self, key)
+        end
+    end
+end)
+
+-- ==================== AI ذكي للعثور على الهدف ====================
+local function getSmartTarget()
+    local bestTarget = nil
+    local bestScore = -math.huge
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and not ignoredPlayers[p.Name] and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            local hum = p.Character:FindFirstChild("Humanoid")
+            if hrp and hum and hum.Health > 0 then
+                local distance = (rootPart.Position - hrp.Position).Magnitude
+                local healthFactor = (hum.Health / hum.MaxHealth) * 10
+                local score = (50 - distance) + (10 - healthFactor)
+                if score > bestScore then
+                    bestScore = score
+                    bestTarget = p
+                end
+            end
+        end
+    end
+    return bestTarget
+end
+
+-- ==================== تصويب تلقائي ====================
+local function updateAim()
+    if not autoAimEnabled then return end
+    local target = getSmartTarget()
+    if target and target.Character then
+        local targetPos = target.Character:FindFirstChild("HumanoidRootPart").Position
+        local newCF = CFrame.new(Camera.CFrame.Position, targetPos)
+        Camera.CFrame = Camera.CFrame:Lerp(newCF, 0.3)
+        rootPart.CFrame = CFrame.new(rootPart.Position, Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z))
+    end
+end
+
+aimBtn.MouseButton1Click:Connect(function()
+    autoAimEnabled = not autoAimEnabled
+    if autoAimEnabled then
+        aimBtn.Text = "🎯 AUTO AIM: ON"
+        aimBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    else
+        aimBtn.Text = "🎯 AUTO AIM: OFF"
+        aimBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+    end
+end)
+
+-- ==================== ESP ====================
+local function clearESP()
+    for _, obj in pairs(espObjects) do
+        pcall(function()
+            if obj.line then obj.line:Destroy() end
+            if obj.name then obj.name:Destroy() end
+            if obj.bar then obj.bar:Destroy() end
         end)
     end
-end)
-
--- إنترو (بدون spawn/delay)
-local function runIntro()
-    local blur = Instance.new("BlurEffect", Lighting); blur.Size = 24
-    local screenGui = Instance.new("ScreenGui", pGui); screenGui.IgnoreGuiInset = true
-    local blackFrame = Instance.new("Frame", screenGui); blackFrame.Size = UDim2.new(1, 0, 1, 0); blackFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0); blackFrame.ZIndex = 100
-    local introLabel = Instance.new("TextLabel", screenGui); introLabel.Size = UDim2.new(0.8, 0, 0.2, 0); introLabel.Position = UDim2.new(0.1, 0, 0.4, 0); introLabel.BackgroundTransparency = 1; introLabel.TextColor3 = Color3.fromRGB(255, 215, 0); introLabel.Font = Enum.Font.Code; introLabel.TextSize = 20; introLabel.ZIndex = 101
-
-    coroutine.wrap(function()
-        for i = 1, 25 do introLabel.Text = "Loading" .. string.rep(".", i % 4); wait(0.04) end
-        wait(0.5)
-        TweenService:Create(blackFrame, TweenInfo.new(1), {BackgroundTransparency = 1}):Play()
-        TweenService:Create(blur, TweenInfo.new(1), {Size = 0}):Play()
-        wait(1); screenGui:Destroy(); blur:Destroy()
-    end)()
-end
-runIntro()
-if camera.FieldOfView ~= 70 then camera.FieldOfView = 70 end
-
--- القائمة الرئيسية
-local mainGui = Instance.new("ScreenGui", pGui)
-mainGui.Name = "Phoenix_Stealth"; mainGui.ResetOnSpawn = false; mainGui.IgnoreGuiInset = true
-
-local mainFrame = Instance.new("Frame", mainGui)
-mainFrame.Size = UDim2.new(0, 420, 0, 380)
-mainFrame.Position = UDim2.new(0.5, -210, 0.5, -190)
-mainFrame.BackgroundTransparency = 1
-mainFrame.Visible = false
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-mainFrame.Draggable = true
-mainFrame.ZIndex = 1
-
-Instance.new("UIStroke", mainFrame).Color = Color3.fromRGB(255, 200, 0)
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 4)
-
-local bgImage = Instance.new("ImageLabel", mainFrame)
-bgImage.Size = UDim2.new(1, 0, 1, 0)
-bgImage.BackgroundTransparency = 1
-bgImage.Image = "rbxassetid://75160743542605"
-bgImage.ScaleType = Enum.ScaleType.Crop
-bgImage.ZIndex = 0
-Instance.new("UICorner", bgImage).CornerRadius = UDim.new(0, 4)
-
-local header = Instance.new("Frame", mainFrame)
-header.Size = UDim2.new(1, 0, 0, 45)
-header.BackgroundColor3 = Color3.fromRGB(20,20,25)
-header.BackgroundTransparency = 0.3
-header.BorderSizePixel = 0
-header.ZIndex = 5
-Instance.new("UICorner", header).CornerRadius = UDim.new(0, 4)
-
-local title = Instance.new("TextLabel", header)
-title.Size = UDim2.new(0, 200, 1, 0)
-title.Position = UDim2.new(0.5, -100, 0, 0)
-title.Text = "🔥 PHOENIX HUB"
-title.TextColor3 = Color3.fromRGB(255, 200, 0)
-title.Font = Enum.Font.GothamBlack
-title.TextSize = 20
-title.BackgroundTransparency = 1
-
--- التبويبات
-local tabContainer = Instance.new("Frame", mainFrame)
-tabContainer.Size = UDim2.new(1, 0, 0, 45)
-tabContainer.Position = UDim2.new(0, 0, 0, 45)
-tabContainer.BackgroundTransparency = 1
-tabContainer.ZIndex = 5
-
-local pages = {}
-local function createTab(name, pos, pageName)
-    local btn = Instance.new("TextButton", tabContainer)
-    btn.Size = UDim2.new(0.2, -6, 1, -8)
-    btn.Position = pos + UDim2.new(0, 3, 0, 4)
-    btn.Text = name
-    btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    btn.BackgroundTransparency = 0.5
-    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 12
-    btn.BorderSizePixel = 0
-    btn.ZIndex = 6
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    local stroke = Instance.new("UIStroke", btn)
-    stroke.Color = Color3.fromRGB(255, 255, 255)
-    stroke.Thickness = 1.2
-
-    local pg = Instance.new("ScrollingFrame", mainFrame)
-    pg.Size = UDim2.new(1, -20, 0, 270)
-    pg.Position = UDim2.new(0, 10, 0, 95)
-    pg.BackgroundTransparency = 1
-    pg.ScrollBarThickness = 2
-    pg.ScrollBarImageColor3 = Color3.fromRGB(255,200,0)
-    pg.Visible = (name == "MAIN")
-    pg.ZIndex = 5
-    pages[pageName] = pg
-
-    btn.MouseButton1Click:Connect(function()
-        for _, p in pairs(pages) do p.Visible = false end
-        pg.Visible = true
-    end)
+    espObjects = {}
 end
 
-createTab("MAIN", UDim2.new(0, 0, 0, 0), "main")
-createTab("HITBOX", UDim2.new(0.2, 0, 0, 0), "hitbox")
-createTab("VISUALS", UDim2.new(0.4, 0, 0, 0), "visuals")
-createTab("AIMBOT", UDim2.new(0.6, 0, 0, 0), "aimbot")
-createTab("AI", UDim2.new(0.8, 0, 0, 0), "ai")
-
-local settings = {
-    speedEnabled = false, speedValue = 24,
-    hbSize = 12, hbEnabled = false,
-    espEnabled = false,
-    aimbotEnabled = false, aimSmoothness = 0.15, aimFOV = 200, aimOffsetX = 0, aimOffsetY = 0,
-    antiTPEnabled = false
-}
-
--- دوال الأزرار
-local function addToggle(parent, text, callback)
-    local btn = Instance.new("TextButton", parent)
-    btn.Size = UDim2.new(0.9, 0, 0, 42)
-    btn.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    btn.BackgroundTransparency = 0.5
-    btn.Text = text .. " ❌"
-    btn.TextColor3 = Color3.fromRGB(200, 200, 200)
-    btn.Font = Enum.Font.GothamBold
-    btn.BorderSizePixel = 0
-    btn.ZIndex = 6
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-    local stroke = Instance.new("UIStroke", btn)
-    stroke.Color = Color3.fromRGB(255, 255, 255)
-    stroke.Thickness = 1.2
-    btn.Position = UDim2.new(0.05, 0, 0, #parent:GetChildren() * 50)
-
-    local active = false
-    btn.MouseButton1Click:Connect(function()
-        active = not active
-        if active then
-            btn.Text = text .. " ✅"
-            stroke.Color = Color3.fromRGB(255, 200, 0)
-        else
-            btn.Text = text .. " ❌"
-            stroke.Color = Color3.fromRGB(255, 255, 255)
-        end
-        callback(active)
-    end)
-end
-
-local function addInput(parent, label, placeholder, callback)
-    local frame = Instance.new("Frame", parent)
-    frame.Size = UDim2.new(0.9, 0, 0, 42)
-    frame.BackgroundTransparency = 1
-    frame.ZIndex = 6
-    frame.Position = UDim2.new(0.05, 0, 0, #parent:GetChildren() * 50)
-
-    local txt = Instance.new("TextLabel", frame)
-    txt.Size = UDim2.new(0.5, 0, 1, 0)
-    txt.Text = label
-    txt.TextColor3 = Color3.fromRGB(200, 200, 200)
-    txt.BackgroundTransparency = 1
-    txt.Font = Enum.Font.GothamBold
-    txt.TextXAlignment = "Left"
-
-    local box = Instance.new("TextBox", frame)
-    box.Size = UDim2.new(0.45, 0, 0.8, 0)
-    box.Position = UDim2.new(0.55, 0, 0.1, 0)
-    box.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    box.BackgroundTransparency = 0.5
-    box.TextColor3 = Color3.fromRGB(0, 0, 0)
-    box.Text = placeholder
-    box.Font = Enum.Font.Code
-    box.BorderSizePixel = 0
-    box.Active = true
-    box.ZIndex = 7
-    Instance.new("UICorner", box).CornerRadius = UDim.new(0, 4)
-    Instance.new("UIStroke", box).Color = Color3.fromRGB(255, 255, 255)
-    box.FocusLost:Connect(function()
-        local val = tonumber(box.Text)
-        if val then callback(val) end
-    end)
-end
-
--- تبويب MAIN
-addInput(pages.main, "Speed:", "24", function(v) settings.speedValue = math.clamp(v,1,200) end)
-addToggle(pages.main, "Speed Hack", function(v) settings.speedEnabled = v end)
-addToggle(pages.main, "Anti-TP (رجوع)", function(v) settings.antiTPEnabled = v end)
-
--- تبويب HITBOX
-addToggle(pages.hitbox, "Hitbox All", function(v) settings.hbEnabled = v end)
-addInput(pages.hitbox, "Size:", "12", function(v) settings.hbSize = math.clamp(v,1,50) end)
-
--- تبويب VISUALS
-addToggle(pages.visuals, "ESP (Name/HP)", function(v) settings.espEnabled = v end)
-
--- تبويب AIMBOT
-addToggle(pages.aimbot, "Aimbot", function(v) settings.aimbotEnabled = v end)
-addInput(pages.aimbot, "Smooth:", "0.15", function(v) settings.aimSmoothness = math.clamp(v,0.01,1) end)
-addInput(pages.aimbot, "FOV:", "200", function(v) settings.aimFOV = v end)
-addInput(pages.aimbot, "Off X:", "0", function(v) settings.aimOffsetX = v end)
-addInput(pages.aimbot, "Off Y:", "0", function(v) settings.aimOffsetY = v end)-- الجزء الثاني
-
--- تبويب AI (نظام المراقبة الذكي - يعمل تلقائياً)
-local securityStatus = Instance.new("TextLabel", pages.ai)
-securityStatus.Size = UDim2.new(0.9, 0, 0, 200)
-securityStatus.Position = UDim2.new(0.05, 0, 0, 10)
-securityStatus.BackgroundTransparency = 1
-securityStatus.TextColor3 = Color3.fromRGB(255, 255, 255)
-securityStatus.Font = Enum.Font.GothamBold
-securityStatus.TextSize = 14
-securityStatus.TextXAlignment = "Left"
-securityStatus.TextYAlignment = "Top"
-securityStatus.Text = "جاري الفحص..."
-
--- إشعار مؤقت (يظهر تلقائياً عند الحاجة)
-local function showNotification(text, color)
-    local notif = Instance.new("TextLabel", mainGui)
-    notif.Size = UDim2.new(0.4, 0, 0, 40)
-    notif.Position = UDim2.new(0.3, 0, 0.02, 0)
-    notif.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    notif.BackgroundTransparency = 0.3
-    notif.TextColor3 = color or Color3.fromRGB(255, 255, 255)
-    notif.Text = text
-    notif.Font = Enum.Font.GothamBold
-    notif.TextSize = 16
-    notif.ZIndex = 10
-    Instance.new("UICorner", notif).CornerRadius = UDim.new(0, 6)
-    -- إزالة بعد 5 ثواني
-    local start = tick()
-    local conn
-    conn = RunService.Heartbeat:Connect(function()
-        if tick() - start >= 5 then
-            notif:Destroy()
-            conn:Disconnect()
-        end
-    end)
-end
-
--- دالة الفحص الأمني (تشتغل تلقائياً في الخلفية)
-local function analyzeMap()
-    local warnings = {}
-    local char = player.Character
-    local hum = char and char:FindFirstChild("Humanoid")
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-
-    -- 1. سرعة المشي الافتراضية
-    if hum then
-        if hum.WalkSpeed ~= 16 and not settings.speedEnabled then
-            table.insert(warnings, "⚠️ السرعة الافتراضية متغيرة – قد يكون هناك كشف للسرعة.")
-        end
-    end
-
-    -- 2. حجم الهيت بوكس
-    if root and not settings.hbEnabled then
-        if root.Size ~= Vector3.new(2,2,1) then
-            table.insert(warnings, "⚠️ حجم الهيت بوكس متغير – قد يكون هناك كشف للهيت بوكس.")
-        end
-    end
-
-    -- 3. ألعاب معروفة بحماية قوية
-    local placeId = game.PlaceId
-    local knownACGames = {
-        [62845836] = "Arsenal",
-        [6872274481] = "BedWars",
-        [301549746] = "Counter Blox",
-    }
-    if knownACGames[placeId] then
-        table.insert(warnings, "🛡️ هذه اللعبة معروفة بحماية قوية ضد الهاكات.")
-    end
-
-    -- 4. فحص أجزاء AntiCheat في workspace
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Name:lower():find("anticheat") then
-            table.insert(warnings, "🛡️ تم العثور على أجزاء AntiCheat في الماب.")
-            break
-        end
-    end
-
-    -- عرض الحالة في التبويب
-    if #warnings == 0 then
-        securityStatus.Text = "✅ الأمان: لم يتم اكتشاف أي تهديدات.\n\nيمكنك تفعيل الميزات بأمان."
-    else
-        securityStatus.Text = "تحذيرات الأمان:\n\n" .. table.concat(warnings, "\n")
-        -- إشعار أعلى الشاشة
-        showNotification("⚠️ توجد تحذيرات أمان، راجع تبويب AI", Color3.fromRGB(255, 100, 100))
-    end
-end
-
--- زر فحص يدوي (للاحتياط)
-local scanButton = Instance.new("TextButton", pages.ai)
-scanButton.Size = UDim2.new(0.9, 0, 0, 40)
-scanButton.Position = UDim2.new(0.05, 0, 0, 220)
-scanButton.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-scanButton.BackgroundTransparency = 0.5
-scanButton.Text = "🔄 فحص الأمان"
-scanButton.TextColor3 = Color3.fromRGB(200, 200, 200)
-scanButton.Font = Enum.Font.GothamBold
-scanButton.BorderSizePixel = 0
-scanButton.ZIndex = 6
-Instance.new("UICorner", scanButton).CornerRadius = UDim.new(0, 6)
-Instance.new("UIStroke", scanButton).Color = Color3.fromRGB(255, 255, 255)
-scanButton.MouseButton1Click:Connect(analyzeMap)
-
--- تشغيل الفحص التلقائي كل 10 ثواني في الخلفية (بدون شرط فتح القائمة)
-local lastScan = 0
-RunService.Heartbeat:Connect(function()
-    if tick() - lastScan >= 10 then
-        lastScan = tick()
-        analyzeMap()
-    end
-end)
-
--- زر الفتح (صورة)
-local openBtn = Instance.new("ImageButton", mainGui)
-openBtn.Size = UDim2.new(0, 55, 0, 55)
-openBtn.Position = UDim2.new(0.03, 0, 0.82, 0)
-openBtn.BackgroundTransparency = 1
-openBtn.Image = "rbxassetid://97303487887939"
-openBtn.ScaleType = Enum.ScaleType.Crop
-openBtn.ZIndex = 10
-openBtn.BorderSizePixel = 0
-Instance.new("UICorner", openBtn).CornerRadius = UDim.new(1, 0)
-Instance.new("UIStroke", openBtn).Color = Color3.fromRGB(255,200,0)
-Instance.new("UIStroke", openBtn).Thickness = 2
-
-openBtn.MouseButton1Click:Connect(function() mainFrame.Visible = not mainFrame.Visible end)-- الجزء الثالث
-
--- الأيم بوت
-local function isVisible(targetPart)
-    if not targetPart then return false end
-    local origin = camera.CFrame.Position; local direction = targetPart.Position - origin
-    if direction.Magnitude < 0.1 then return true end
-    local raycastParams = RaycastParams.new(); raycastParams.FilterType = Enum.RaycastFilterType.Exclude; raycastParams.FilterDescendantsInstances = {player.Character, targetPart.Parent}; raycastParams.IgnoreWater = true
-    return workspace:Raycast(origin, direction, raycastParams) == nil
-end
-
-local mouse = nil pcall(function() mouse = player:GetMouse() end)
-local function getAimPosition()
-    if mouse then return Vector2.new(mouse.X, mouse.Y) + Vector2.new(settings.aimOffsetX, settings.aimOffsetY)
-    else return camera.ViewportSize/2 + Vector2.new(settings.aimOffsetX, settings.aimOffsetY) end
-end
-
-local function getClosestPlayerToMouse()
-    local target, minDist = nil, settings.aimFOV; local aimPos = getAimPosition()
-    for _, v in pairs(Players:GetPlayers()) do
-        if v ~= player and v.Character and v.Character:FindFirstChild("HumanoidRootPart") and v.Character:FindFirstChild("Humanoid") and v.Character.Humanoid.Health > 0 then
-            local hrp = v.Character.HumanoidRootPart; local pos, onScreen = camera:WorldToViewportPoint(hrp.Position)
-            if onScreen then
-                local dist = (Vector2.new(pos.X, pos.Y) - aimPos).Magnitude
-                if dist < minDist and isVisible(hrp) then minDist = dist; target = hrp end
+local function updateESP()
+    if not espEnabled then clearESP() return end
+    local viewX, viewY = Camera.ViewportSize.X, Camera.ViewportSize.Y
+    local centerX = viewX / 2
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and not ignoredPlayers[p.Name] and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            local hum = p.Character:FindFirstChild("Humanoid")
+            if hrp and hum and hum.Health > 0 then
+                local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 2, 0))
+                if onScreen and pos.Z > 0 then
+                    if not espObjects[p] then
+                        espObjects[p] = {}
+                        local line = Instance.new("Frame")
+                        line.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
+                        line.BorderSizePixel = 0
+                        line.Parent = espContainer
+                        espObjects[p].line = line
+                        local name = Instance.new("TextLabel")
+                        name.Size = UDim2.new(0, 140, 0, 22)
+                        name.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+                        name.BackgroundTransparency = 0.5
+                        name.TextColor3 = Color3.fromRGB(255, 255, 255)
+                        name.TextSize = 12
+                        name.Font = Enum.Font.GothamBold
+                        name.Parent = espContainer
+                        Instance.new("UICorner", name).CornerRadius = UDim.new(0, 4)
+                        espObjects[p].name = name
+                        local bar = Instance.new("Frame")
+                        bar.Size = UDim2.new(0, 60, 0, 6)
+                        bar.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+                        bar.BorderSizePixel = 0
+                        bar.Parent = espContainer
+                        Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
+                        espObjects[p].bar = bar
+                    end
+                    local esp = espObjects[p]
+                    local healthPercent = hum.Health / hum.MaxHealth
+                    local startY = viewY
+                    local endY = pos.Y
+                    local distance = startY - endY
+                    local angle = math.atan2(endY - startY, pos.X - centerX)
+                    esp.line.Size = UDim2.new(0, 2, 0, math.abs(distance))
+                    esp.line.Position = UDim2.new(0, centerX, 0, endY)
+                    esp.line.Rotation = math.deg(angle)
+                    esp.line.Visible = true
+                    esp.name.Text = "[" .. p.Name .. "]"
+                    esp.name.Position = UDim2.new(0, pos.X - 70, 0, pos.Y - 40)
+                    esp.name.Visible = true
+                    local barWidth = 60 * healthPercent
+                    esp.bar.Size = UDim2.new(0, barWidth, 0, 6)
+                    esp.bar.Position = UDim2.new(0, pos.X - 30, 0, pos.Y - 18)
+                    esp.bar.BackgroundColor3 = Color3.fromRGB(0, 200, 0):Lerp(Color3.fromRGB(200, 0, 0), 1 - healthPercent)
+                    esp.bar.Visible = true
+                else
+                    if espObjects[p] then
+                        if espObjects[p].line then espObjects[p].line.Visible = false end
+                        if espObjects[p].name then espObjects[p].name.Visible = false end
+                        if espObjects[p].bar then espObjects[p].bar.Visible = false end
+                    end
+                end
+            else
+                if espObjects[p] then
+                    pcall(function()
+                        if espObjects[p].line then espObjects[p].line:Destroy() end
+                        if espObjects[p].name then espObjects[p].name:Destroy() end
+                        if espObjects[p].bar then espObjects[p].bar:Destroy() end
+                    end)
+                    espObjects[p] = nil
+                end
             end
         end
     end
-    return target
 end
 
-RunService.RenderStepped:Connect(function()
-    if settings.aimbotEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        local tgt = getClosestPlayerToMouse()
-        if tgt then camera.CFrame = camera.CFrame:Lerp(CFrame.new(camera.CFrame.Position, tgt.Position), settings.aimSmoothness) end
+espBtn.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    if espEnabled then
+        espBtn.Text = "🔍 ESP: ON"
+        espBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    else
+        espBtn.Text = "🔍 ESP: OFF"
+        espBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
+        clearESP()
     end
 end)
 
--- ESP
-local function createESP_UI(targetPlayer)
-    local bgGui = Instance.new("BillboardGui"); bgGui.Name = ESP_ID; bgGui.AlwaysOnTop = true; bgGui.Size = UDim2.new(4.5,0,6,0); bgGui.ResetOnSpawn = true
-    local box = Instance.new("Frame", bgGui); box.Size = UDim2.new(1,0,1,0); box.BackgroundTransparency = 1; Instance.new("UIStroke", box).Color = Color3.fromRGB(255,140,0)
-    local nameLabel = Instance.new("TextLabel", bgGui); nameLabel.Size = UDim2.new(1,0,0.2,0); nameLabel.Position = UDim2.new(0,0,-0.25,0); nameLabel.BackgroundTransparency = 1; nameLabel.TextColor3 = Color3.fromRGB(255,255,255); nameLabel.TextStrokeTransparency = 0; nameLabel.Font = Enum.Font.GothamBold; nameLabel.TextSize = 11; nameLabel.Text = targetPlayer.Name
-    local healthBg = Instance.new("Frame", bgGui); healthBg.Size = UDim2.new(0.1,0,1,0); healthBg.Position = UDim2.new(-0.15,0,0,0); healthBg.BackgroundColor3 = Color3.fromRGB(40,0,0); healthBg.BorderSizePixel = 0
-    local healthBar = Instance.new("Frame", healthBg); healthBar.Size = UDim2.new(1,0,1,0); healthBar.BackgroundColor3 = Color3.fromRGB(0,255,0); healthBar.BorderSizePixel = 0
-    local conn = RunService.Heartbeat:Connect(function()
-        if targetPlayer.Character and targetPlayer.Character:FindFirstChild("Humanoid") and bgGui.Parent then
-            local hum = targetPlayer.Character.Humanoid; local ratio = math.clamp(hum.Health/hum.MaxHealth,0,1)
-            healthBar.Size = UDim2.new(1,0,ratio,0); healthBar.Position = UDim2.new(0,0,1-ratio,0)
-            healthBar.BackgroundColor3 = Color3.fromRGB(255,0,0):Lerp(Color3.fromRGB(0,255,0), ratio)
-        else conn:Disconnect() end
-    end)
-    bgGui.Destroying:Connect(function() conn:Disconnect() end)
-    return bgGui
-end
-
--- Anti-TP
-local lastGroundPos = Vector3.zero; local antiTPButton = nil
-RunService.RenderStepped:Connect(function()
-    pcall(function()
-        if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
-            local hum = player.Character.Humanoid
-            if hum.Health > 0 and hum.FloorMaterial ~= Enum.Material.Air then lastGroundPos = player.Character.HumanoidRootPart.Position end
-        end
-    end)
-end)
-
-local antiTPGui = Instance.new("ScreenGui", pGui); antiTPGui.Name = "AntiTPGui"; antiTPGui.IgnoreGuiInset = true; antiTPGui.ResetOnSpawn = false
-
-local function updateAntiTPButton()
-    if settings.antiTPEnabled then
-        if not antiTPButton then
-            local btnFrame = Instance.new("Frame", antiTPGui); btnFrame.Size = UDim2.new(0,75,0,40); btnFrame.Position = UDim2.new(0.82,0,0.88,0); btnFrame.BackgroundColor3 = Color3.fromRGB(200,40,40); btnFrame.BackgroundTransparency = 0.3; btnFrame.Active = true; btnFrame.Draggable = true; btnFrame.ZIndex = 5; btnFrame.BorderSizePixel = 0
-            Instance.new("UICorner", btnFrame).CornerRadius = UDim.new(0,6); Instance.new("UIStroke", btnFrame).Color = Color3.fromRGB(255,200,200)
-            local btnText = Instance.new("TextButton", btnFrame); btnText.Size = UDim2.new(1,0,1,0); btnText.BackgroundTransparency = 1; btnText.Text = "↩️ رجوع"; btnText.TextColor3 = Color3.fromRGB(255,255,255); btnText.Font = Enum.Font.GothamBold; btnText.TextSize = 14; btnText.ZIndex = 5
-            btnText.MouseButton1Click:Connect(function()
-                if player.Character and player.Character:FindFirstChild("HumanoidRootPart") and lastGroundPos ~= Vector3.zero then
-                    player.Character.HumanoidRootPart.CFrame = CFrame.new(lastGroundPos); player.Character.HumanoidRootPart.Velocity = Vector3.zero
+-- ==================== قائمة تجاهل اللاعبين ====================
+local selectGui = nil
+ignoreBtn.MouseButton1Click:Connect(function()
+    if selectGui then selectGui:Destroy() selectGui = nil return end
+    selectGui = Instance.new("ScreenGui")
+    selectGui.Name = "SelectPlayer"
+    selectGui.Parent = screenGui
+    local selectFrame = Instance.new("Frame")
+    selectFrame.Size = UDim2.new(0.8, 0, 0, 0.6)
+    selectFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
+    selectFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    selectFrame.Draggable = true
+    selectFrame.Parent = selectGui
+    Instance.new("UICorner", selectFrame).CornerRadius = UDim.new(0, 12)
+    local selTitle = Instance.new("TextLabel")
+    selTitle.Size = UDim2.new(1, 0, 0, 40)
+    selTitle.BackgroundColor3 = Color3.fromRGB(200, 100, 50)
+    selTitle.Text = "IGNORE PLAYER"
+    selTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    selTitle.TextSize = 16
+    selTitle.Font = Enum.Font.GothamBold
+    selTitle.Parent = selectFrame
+    Instance.new("UICorner", selTitle).CornerRadius = UDim.new(0, 12)
+    local closeSel = Instance.new("TextButton")
+    closeSel.Size = UDim2.new(0, 35, 0, 35)
+    closeSel.Position = UDim2.new(1, -40, 0, 3)
+    closeSel.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    closeSel.Text = "X"
+    closeSel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeSel.TextSize = 18
+    closeSel.Font = Enum.Font.GothamBold
+    closeSel.Parent = selTitle
+    Instance.new("UICorner", closeSel).CornerRadius = UDim.new(1, 0)
+    closeSel.MouseButton1Click:Connect(function() selectGui:Destroy() selectGui = nil end)
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1, -10, 0, -50)
+    scroll.Position = UDim2.new(0, 5, 0, 45)
+    scroll.BackgroundTransparency = 1
+    scroll.ScrollBarThickness = 5
+    scroll.Parent = selectFrame
+    local y = 0
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 45)
+            btn.Position = UDim2.new(0, 5, 0, y)
+            btn.BackgroundColor3 = ignoredPlayers[p.Name] and Color3.fromRGB(0, 120, 40) or Color3.fromRGB(50, 50, 70)
+            btn.Text = p.Name .. (ignoredPlayers[p.Name] and " ✓" or "")
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.TextSize = 14
+            btn.Font = Enum.Font.Gotham
+            btn.TextXAlignment = "Left"
+            btn.Parent = scroll
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+            btn.MouseButton1Click:Connect(function()
+                if ignoredPlayers[p.Name] then
+                    ignoredPlayers[p.Name] = nil
+                    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
+                    btn.Text = p.Name
+                else
+                    ignoredPlayers[p.Name] = true
+                    btn.BackgroundColor3 = Color3.fromRGB(0, 120, 40)
+                    btn.Text = p.Name .. " ✓"
                 end
             end)
-            antiTPButton = btnFrame
+            y = y + 50
         end
-    else
-        if antiTPButton then antiTPButton:Destroy(); antiTPButton = nil end
     end
+    scroll.CanvasSize = UDim2.new(0, 0, 0, y + 20)
+end)
+
+-- ==================== التلبورت ====================
+local function getHandPos(target)
+    local char = target.Character
+    if not char then return nil end
+    local hand = char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm") or char:FindFirstChild("ArmR")
+    if hand then return hand.Position end
+    local head = char:FindFirstChild("Head")
+    if head then return head.Position + Vector3.new(1, 0, 0) end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if hrp then return hrp.Position + Vector3.new(1.5, 1, 0) end
+    return nil
 end
-RunService.RenderStepped:Connect(function() updateAntiTPButton() end)
 
--- المحرك الرئيسي
-RunService.RenderStepped:Connect(function()
-    pcall(function()
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-            player.Character.Humanoid.WalkSpeed = settings.speedEnabled and settings.speedValue or 16
-        end
+local function teleportTo(pos)
+    if rootPart and pos then rootPart.CFrame = CFrame.new(pos) end
+end
 
-        for _, v in pairs(Players:GetPlayers()) do
-            if v ~= player and v.Character then
-                local hrp = v.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then
-                    local humanoid = v.Character:FindFirstChild("Humanoid")
-                    if humanoid and humanoid.Health > 0 then
-                        local canHitbox = (humanoid.SeatPart == nil)
-                        if settings.hbEnabled and canHitbox then
-                            hrp.Size = Vector3.new(settings.hbSize, settings.hbSize, settings.hbSize); hrp.Transparency = 0.8; hrp:SetAttribute(HITBOX_ATTR, true)
-                        else
-                            if hrp:GetAttribute(HITBOX_ATTR) then hrp.Size = Vector3.new(2,2,1); hrp.Transparency = 1; hrp:SetAttribute(HITBOX_ATTR, nil) end
-                        end
-                    else
-                        if hrp:GetAttribute(HITBOX_ATTR) then hrp.Size = Vector3.new(2,2,1); hrp.Transparency = 1; hrp:SetAttribute(HITBOX_ATTR, nil) end
-                    end
+local function doTeleport()
+    if isTeleporting then return end
+    isTeleporting = true
+    local target = getSmartTarget()
+    if not target then
+        tpButton.Text = "❌"
+        tpButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        task.wait(0.5)
+        tpButton.Text = "🔮\nTP"
+        tpButton.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+        isTeleporting = false
+        return
+    end
+    local handPos = getHandPos(target)
+    if not handPos then
+        tpButton.Text = "⚠️"
+        tpButton.BackgroundColor3 = Color3.fromRGB(200, 100, 50)
+        task.wait(0.5)
+        tpButton.Text = "🔮\nTP"
+        tpButton.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+        isTeleporting = false
+        return
+    end
+    savedPosition = rootPart.CFrame
+    teleportTo(handPos)
+    tpButton.Text = "🔄"
+    tpButton.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
+    for ang = 0, 300, 60 do
+        local rad = math.rad(ang)
+        local offset = Vector3.new(math.cos(rad) * 2, 0, math.sin(rad) * 2)
+        pcall(function() rootPart.CFrame = CFrame.new(handPos + offset, handPos) end)
+        task.wait(0.01)
+    end
+    tpButton.Text = "📍"
+    tpButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    task.wait(0.05)
+    if savedPosition then
+        teleportTo(savedPosition.Position)
+        savedPosition = nil
+    end
+    tpButton.Text = "🔮\nTP"
+    tpButton.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+    isTeleporting = false
+end
 
-                    local esp = hrp:FindFirstChild(ESP_ID)
-                    if settings.espEnabled then
-                        if not esp then createESP_UI(v).Parent = hrp end
-                    elseif esp then esp:Destroy() end
-                end
-            end
-        end
-    end)
-end)
-
--- تشغيل القائمة بعد 4 ثواني (أول فحص يتم تلقائياً)
-local initialStartDone = false
-RunService.Heartbeat:Connect(function()
-    if not initialStartDone and tick() >= 4 then
-        initialStartDone = true
-        mainFrame.Visible = true
+-- تفعيل زر التلبورت المنفصل
+tpActivateBtn.MouseButton1Click:Connect(function()
+    isTeleportActive = not isTeleportActive
+    if isTeleportActive then
+        tpActivateBtn.Text = "🌀 TELEPORT: ON"
+        tpActivateBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        tpButton.Visible = true
+    else
+        tpActivateBtn.Text = "🌀 ACTIVATE TELEPORT"
+        tpActivateBtn.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+        tpButton.Visible = false
     end
 end)
+
+tpButton.MouseButton1Click:Connect(function()
+    if isTeleportActive and not isTeleporting then doTeleport() end
+end)
+
+-- ==================== إظهار/إخفاء القائمة ====================
+local menuVisible = true
+toggleBtn.MouseButton1Click:Connect(function()
+    menuVisible = not menuVisible
+    mainFrame.Visible = menuVisible
+    toggleBtn.Text = menuVisible and "⚡" or "✖"
+end)
+
+-- ==================== حلقات التحديث ====================
+RunService.RenderStepped:Connect(function()
+    if espEnabled then pcall(updateESP) end
+    if autoAimEnabled then pcall(updateAim) end
+end)
+
+RunService.Heartbeat:Connect(function()
+    if speedEnabled and humanoid and humanoid.WalkSpeed ~= currentSpeedVal then
+        humanoid.WalkSpeed = currentSpeedVal
+    end
+end)
+
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = character:WaitForChild("Humanoid")
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    if speedEnabled then
+        task.wait(0.3)
+        humanoid.WalkSpeed = currentSpeedVal
+    end
+end)
+
+-- زر الإغلاق في القائمة
+closeBtn.MouseButton1Click:Connect(function()
+    mainFrame.Visible = false
+    menuVisible = false
+    toggleBtn.Text = "✖"
+end)
+
+print("✅ تم تحميل Delta Hub Mobile بالكامل! استمتع!")
