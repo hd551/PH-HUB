@@ -1,5 +1,5 @@
 -- ============================================
--- Delta Hub Mobile - نسخة محسنة للجوال (الجزء 1/3)
+-- Delta Hub Pro | Black & Red Edition | الجزء 1/3
 -- ============================================
 
 local Players = game:GetService("Players")
@@ -18,139 +18,313 @@ local currentSpeed = 16
 local isTeleporting = false
 local ignoredPlayers = {}
 local espEnabled = false
-local espObjects = {}
+local espNameTags = {}
+local espHealthBars = {}
 local autoAimEnabled = false
 local hitboxEnabled = false
 local hitboxSize = 8
 
--- إنشاء الواجهة الرئيسية (ستظهر بشكل جميل على الجوال)
+-- إنشاء الواجهة الرئيسية
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DeltaMobile"
+screenGui.Name = "DeltaPro"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- حاوية ESP (لن تتأثر بحجم الشاشة)
-local espContainer = Instance.new("Frame")
-espContainer.Size = UDim2.new(1, 0, 1, 0)
-espContainer.BackgroundTransparency = 1
-espContainer.Parent = screenGui
-
-print("✅ الجزء الأول تم تحميله بنجاح - انتقل للجزء الثاني")-- ============================================
--- الجزء 2/3: القائمة الرئيسية بتصميم جوال
--- ============================================
-
+-- القائمة الرئيسية (أسود وأحمر)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0.9, 0, 0, 0.7) -- 90% عرض الشاشة، 70% ارتفاع
-mainFrame.Position = UDim2.new(0.05, 0, 0.15, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-mainFrame.BackgroundTransparency = 0.1
+mainFrame.Size = UDim2.new(0, 320, 0, 480)
+mainFrame.Position = UDim2.new(0.5, -160, 0.5, -240)
+mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+mainFrame.BackgroundTransparency = 0.05
 mainFrame.Draggable = true
 mainFrame.Active = true
 mainFrame.Visible = true
 mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
+local border = Instance.new("UIStroke", mainFrame)
+border.Color = Color3.fromRGB(200, 0, 0)
+border.Thickness = 2
 
--- شريط عنوان كبير
+-- عنوان القائمة
 local title = Instance.new("TextLabel")
 title.Size = UDim2.new(1, 0, 0, 50)
-title.BackgroundColor3 = Color3.fromRGB(0, 120, 200)
-title.Text = "⚡ DELTA MOBILE ⚡"
+title.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+title.Text = "🔥 DELTA PRO 🔥"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
 title.TextSize = 20
 title.Font = Enum.Font.GothamBold
 title.Parent = mainFrame
 Instance.new("UICorner", title).CornerRadius = UDim.new(0, 12)
 
--- حاوية الأزرار (ScrollingFrame لأن القائمة طويلة)
-local btnContainer = Instance.new("ScrollingFrame")
-btnContainer.Size = UDim2.new(1, -10, 1, -60)
-btnContainer.Position = UDim2.new(0, 5, 0, 55)
-btnContainer.BackgroundTransparency = 1
-btnContainer.ScrollBarThickness = 5
-btnContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-btnContainer.Parent = mainFrame
+-- حاوية قابلة للتمرير
+local scrollContainer = Instance.new("ScrollingFrame")
+scrollContainer.Size = UDim2.new(1, -10, 1, -60)
+scrollContainer.Position = UDim2.new(0, 5, 0, 55)
+scrollContainer.BackgroundTransparency = 1
+scrollContainer.ScrollBarThickness = 4
+scrollContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+scrollContainer.Parent = mainFrame
 
--- دالة مساعدة لإنشاء الأزرار بشكل جميل ومناسب للجوال
-local function createBtn(text, yPos, color)
+-- دالة لإنشاء خانة (Card) لكل ميزة
+local function createCard(titleText, yPos, color)
+    local card = Instance.new("Frame")
+    card.Size = UDim2.new(1, -10, 0, 70)
+    card.Position = UDim2.new(0, 5, 0, yPos)
+    card.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    card.BorderSizePixel = 0
+    card.Parent = scrollContainer
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
+    
+    local titleLabel = Instance.new("TextLabel")
+    titleLabel.Size = UDim2.new(1, 0, 0, 25)
+    titleLabel.Position = UDim2.new(0, 10, 0, 5)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.Text = titleText
+    titleLabel.TextColor3 = color
+    titleLabel.TextSize = 12
+    titleLabel.Font = Enum.Font.GothamBold
+    titleLabel.TextXAlignment = "Left"
+    titleLabel.Parent = card
+    
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, -10, 0, 55)
-    btn.Position = UDim2.new(0, 5, 0, yPos)
-    btn.BackgroundColor3 = color
-    btn.Text = text
+    btn.Size = UDim2.new(0.4, 0, 0, 30)
+    btn.Position = UDim2.new(0.55, 0, 0, 30)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    btn.Text = "OFF"
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 14
+    btn.TextSize = 12
     btn.Font = Enum.Font.GothamBold
-    btn.Parent = btnContainer
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-    return btn
+    btn.Parent = card
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+    
+    return card, btn
 end
 
--- الأزرار (سنضيف لها وظائف لاحقاً)
-local espBtn = createBtn("🔍 ESP: OFF", 0, Color3.fromRGB(0, 150, 200))
-local ignoreBtn = createBtn("👤 IGNORE PLAYER", 65, Color3.fromRGB(200, 100, 50))
-local hitboxBtn = createBtn("📦 HITBOX: OFF", 130, Color3.fromRGB(150, 50, 150))
-local aimBtn = createBtn("🎯 AUTO AIM: OFF", 195, Color3.fromRGB(255, 80, 80))
-local speedBtn = createBtn("⚡ SPEED: OFF (50)", 260, Color3.fromRGB(100, 150, 255))
-local tpActivateBtn = createBtn("🌀 ACTIVATE TELEPORT", 325, Color3.fromRGB(100, 150, 255))
-local closeBtn = createBtn("✖️ CLOSE MENU", 390, Color3.fromRGB(100, 100, 100))
+-- إنشاء الخانات
+local espCard, espBtn = createCard("🔍 ESP (Names + Health)", 0, Color3.fromRGB(0, 200, 255))
+local ignoreCard, ignoreBtn = createCard("👤 Ignore Player", 75, Color3.fromRGB(255, 150, 50))
+local hitboxCard, hitboxBtn = createCard("📦 Hitbox Extender", 150, Color3.fromRGB(200, 50, 200))
+local aimCard, aimBtn = createCard("🎯 Auto Aim", 225, Color3.fromRGB(255, 80, 80))
+local speedCard, speedBtn = createCard("⚡ Speed Control", 300, Color3.fromRGB(100, 200, 255))
+local teleportCard, teleportBtn = createCard("🌀 Teleport", 375, Color3.fromRGB(200, 100, 50))
 
--- تحديث حجم الـ ScrollingFrame
-btnContainer.CanvasSize = UDim2.new(0, 0, 0, 460)
+scrollContainer.CanvasSize = UDim2.new(0, 0, 0, 470)
 
--- زر فتح القائمة المنفصل (صغير ويمكن تحريكه)
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(0, 60, 0, 60)
-toggleBtn.Position = UDim2.new(0.02, 0, 0.8, 0)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
-toggleBtn.Text = "⚡"
-toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-toggleBtn.TextSize = 24
-toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.Draggable = true
+-- زر فتح القائمة الاحترافي
+local toggleBtn = Instance.new("ImageButton")
+toggleBtn.Size = UDim2.new(0, 55, 0, 55)
+toggleBtn.Position = UDim2.new(0.02, 0, 0.85, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+toggleBtn.Image = "rbxassetid://3926305904"
+toggleBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.Parent = screenGui
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
+local toggleBorder = Instance.new("UIStroke", toggleBtn)
+toggleBorder.Color = Color3.fromRGB(255, 255, 255)
+toggleBorder.Thickness = 1.5
 
 -- زر التلبورت المنفصل (سيظهر عند التفعيل)
 local tpButton = Instance.new("TextButton")
-tpButton.Size = UDim2.new(0, 70, 0, 70)
-tpButton.Position = UDim2.new(0.8, 0, 0.7, 0)
-tpButton.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+tpButton.Size = UDim2.new(0, 65, 0, 65)
+tpButton.Position = UDim2.new(0.85, 0, 0.75, 0)
+tpButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
 tpButton.Text = "🔮\nTP"
 tpButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-tpButton.TextSize = 14
+tpButton.TextSize = 12
 tpButton.Font = Enum.Font.GothamBold
 tpButton.Visible = false
 tpButton.Draggable = true
 tpButton.Parent = screenGui
 Instance.new("UICorner", tpButton).CornerRadius = UDim.new(1, 0)
+local tpBorder = Instance.new("UIStroke", tpButton)
+tpBorder.Color = Color3.fromRGB(200, 0, 0)
+tpBorder.Thickness = 1
 
-print("✅ الجزء الثاني تم تحميله - انتقل للجزء الثالث (الأخير)")-- ============================================
--- الجزء 3/3: جميع الوظائف (ESP، هيت بوكس، تصويب، تلبورت)
+print("✅ الجزء 1/3 تم تحميله - انتقل للجزء الثاني")-- ============================================
+-- Delta Hub Pro | الجزء 2/3 (ESP + Ignore List)
 -- ============================================
 
--- متغيرات السرعة
+-- ==================== ESP (بدون خطوط) ====================
+local function clearESP()
+    for _, obj in pairs(espNameTags) do pcall(function() obj:Destroy() end) end
+    for _, obj in pairs(espHealthBars) do pcall(function() obj:Destroy() end) end
+    espNameTags = {}
+    espHealthBars = {}
+end
+
+local function updateESP()
+    if not espEnabled then clearESP() return end
+    
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player and not ignoredPlayers[p.Name] and p.Character then
+            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+            local hum = p.Character:FindFirstChild("Humanoid")
+            if hrp and hum and hum.Health > 0 then
+                local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 2, 0))
+                if onScreen and pos.Z > 0 then
+                    -- اسم اللاعب
+                    if not espNameTags[p] then
+                        local nameTag = Instance.new("TextLabel")
+                        nameTag.Size = UDim2.new(0, 140, 0, 22)
+                        nameTag.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+                        nameTag.BackgroundTransparency = 0.5
+                        nameTag.TextColor3 = Color3.fromRGB(255, 255, 255)
+                        nameTag.TextSize = 12
+                        nameTag.Font = Enum.Font.GothamBold
+                        nameTag.Parent = screenGui
+                        Instance.new("UICorner", nameTag).CornerRadius = UDim.new(0, 4)
+                        espNameTags[p] = nameTag
+                    end
+                    espNameTags[p].Text = "[" .. p.Name .. "]"
+                    espNameTags[p].Position = UDim2.new(0, pos.X - 70, 0, pos.Y - 40)
+                    espNameTags[p].Visible = true
+                    
+                    -- شريط الدم
+                    if not espHealthBars[p] then
+                        local healthBar = Instance.new("Frame")
+                        healthBar.Size = UDim2.new(0, 60, 0, 6)
+                        healthBar.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+                        healthBar.BorderSizePixel = 0
+                        healthBar.Parent = screenGui
+                        Instance.new("UICorner", healthBar).CornerRadius = UDim.new(1, 0)
+                        espHealthBars[p] = healthBar
+                    end
+                    local healthPercent = hum.Health / hum.MaxHealth
+                    local barWidth = 60 * healthPercent
+                    espHealthBars[p].Size = UDim2.new(0, barWidth, 0, 6)
+                    espHealthBars[p].Position = UDim2.new(0, pos.X - 30, 0, pos.Y - 18)
+                    espHealthBars[p].BackgroundColor3 = Color3.fromRGB(0, 200, 0):Lerp(Color3.fromRGB(200, 0, 0), 1 - healthPercent)
+                    espHealthBars[p].Visible = true
+                else
+                    if espNameTags[p] then espNameTags[p].Visible = false end
+                    if espHealthBars[p] then espHealthBars[p].Visible = false end
+                end
+            else
+                if espNameTags[p] then espNameTags[p]:Destroy() espNameTags[p] = nil end
+                if espHealthBars[p] then espHealthBars[p]:Destroy() espHealthBars[p] = nil end
+            end
+        else
+            if espNameTags[p] then espNameTags[p]:Destroy() espNameTags[p] = nil end
+            if espHealthBars[p] then espHealthBars[p]:Destroy() espHealthBars[p] = nil end
+        end
+    end
+end
+
+espBtn.MouseButton1Click:Connect(function()
+    espEnabled = not espEnabled
+    if espEnabled then
+        espBtn.Text = "ON"
+        espBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+    else
+        espBtn.Text = "OFF"
+        espBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+        clearESP()
+    end
+end)
+
+-- ==================== قائمة تجاهل اللاعبين ====================
+local selectGui = nil
+ignoreBtn.MouseButton1Click:Connect(function()
+    if selectGui then selectGui:Destroy() selectGui = nil return end
+    
+    selectGui = Instance.new("ScreenGui")
+    selectGui.Name = "SelectPlayer"
+    selectGui.Parent = screenGui
+    
+    local selectFrame = Instance.new("Frame")
+    selectFrame.Size = UDim2.new(0, 280, 0, 350)
+    selectFrame.Position = UDim2.new(0.5, -140, 0.5, -175)
+    selectFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    selectFrame.Draggable = true
+    selectFrame.Parent = selectGui
+    Instance.new("UICorner", selectFrame).CornerRadius = UDim.new(0, 12)
+    Instance.new("UIStroke", selectFrame).Color = Color3.fromRGB(200, 0, 0)
+    
+    local selTitle = Instance.new("TextLabel")
+    selTitle.Size = UDim2.new(1, 0, 0, 40)
+    selTitle.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+    selTitle.Text = "IGNORE PLAYER"
+    selTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+    selTitle.TextSize = 16
+    selTitle.Font = Enum.Font.GothamBold
+    selTitle.Parent = selectFrame
+    Instance.new("UICorner", selTitle).CornerRadius = UDim.new(0, 12)
+    
+    local closeSel = Instance.new("TextButton")
+    closeSel.Size = UDim2.new(0, 35, 0, 35)
+    closeSel.Position = UDim2.new(1, -40, 0, 3)
+    closeSel.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+    closeSel.Text = "X"
+    closeSel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeSel.TextSize = 18
+    closeSel.Font = Enum.Font.GothamBold
+    closeSel.Parent = selTitle
+    Instance.new("UICorner", closeSel).CornerRadius = UDim.new(1, 0)
+    closeSel.MouseButton1Click:Connect(function() selectGui:Destroy() selectGui = nil end)
+    
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1, -10, 0, 270)
+    scroll.Position = UDim2.new(0, 5, 0, 45)
+    scroll.BackgroundTransparency = 1
+    scroll.ScrollBarThickness = 4
+    scroll.Parent = selectFrame
+    
+    local y = 0
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= player then
+            local btn = Instance.new("TextButton")
+            btn.Size = UDim2.new(1, -10, 0, 45)
+            btn.Position = UDim2.new(0, 5, 0, y)
+            btn.BackgroundColor3 = ignoredPlayers[p.Name] and Color3.fromRGB(0, 100, 0) or Color3.fromRGB(40, 40, 50)
+            btn.Text = p.Name .. (ignoredPlayers[p.Name] and " ✓" or "")
+            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            btn.TextSize = 14
+            btn.Font = Enum.Font.Gotham
+            btn.TextXAlignment = "Left"
+            btn.Parent = scroll
+            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+            btn.MouseButton1Click:Connect(function()
+                if ignoredPlayers[p.Name] then
+                    ignoredPlayers[p.Name] = nil
+                    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+                    btn.Text = p.Name
+                else
+                    ignoredPlayers[p.Name] = true
+                    btn.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
+                    btn.Text = p.Name .. " ✓"
+                end
+            end)
+            y = y + 50
+        end
+    end
+    scroll.CanvasSize = UDim2.new(0, 0, 0, y + 20)
+end)
+
+print("✅ الجزء 2/3 تم تحميله - انتقل للجزء الثالث")-- ============================================
+-- Delta Hub Pro | الجزء 3/3 (Speed, Hitbox, Auto Aim, Teleport, Loops)
+-- ============================================
+
+-- ==================== السرعة ====================
 local speedEnabled = false
 local currentSpeedVal = 50
 
--- وظيفة السرعة
 speedBtn.MouseButton1Click:Connect(function()
     speedEnabled = not speedEnabled
     if speedEnabled then
-        speedBtn.Text = "⚡ SPEED: ON (" .. currentSpeedVal .. ")"
-        speedBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        speedBtn.Text = "ON"
+        speedBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
         humanoid.WalkSpeed = currentSpeedVal
     else
-        speedBtn.Text = "⚡ SPEED: OFF (" .. currentSpeedVal .. ")"
-        speedBtn.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+        speedBtn.Text = "OFF"
+        speedBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
         humanoid.WalkSpeed = 16
     end
 end)
 
--- مربع إدخال السرعة (يظهر عند الضغط المطول)
 local speedBox = Instance.new("TextBox")
-speedBox.Size = UDim2.new(0, 150, 0, 40)
-speedBox.Position = UDim2.new(0.5, -75, 0.5, -20)
-speedBox.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+speedBox.Size = UDim2.new(0, 120, 0, 40)
+speedBox.Position = UDim2.new(0.5, -60, 0.5, -20)
+speedBox.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
 speedBox.Text = "50"
 speedBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 speedBox.TextSize = 16
@@ -159,7 +333,7 @@ speedBox.Visible = false
 speedBox.Parent = screenGui
 Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0, 8)
 
-speedBtn.MouseButton2Click:Connect(function() -- الضغط بزر الفأرة الأيمن أو الضغط المطول على الجوال
+speedBtn.MouseButton2Click:Connect(function()
     speedBox.Visible = true
     speedBox:CaptureFocus()
 end)
@@ -168,12 +342,7 @@ speedBox.FocusLost:Connect(function(enterPressed)
         local newSpeed = tonumber(speedBox.Text)
         if newSpeed then
             currentSpeedVal = newSpeed
-            if speedEnabled then
-                humanoid.WalkSpeed = currentSpeedVal
-                speedBtn.Text = "⚡ SPEED: ON (" .. currentSpeedVal .. ")"
-            else
-                speedBtn.Text = "⚡ SPEED: OFF (" .. currentSpeedVal .. ")"
-            end
+            if speedEnabled then humanoid.WalkSpeed = currentSpeedVal end
         end
     end
     speedBox.Visible = false
@@ -197,20 +366,18 @@ end
 
 RunService.Heartbeat:Connect(function()
     if hitboxEnabled then
-        for _, plr in pairs(Players:GetPlayers()) do
-            pcall(applyHitbox, plr)
-        end
+        for _, plr in pairs(Players:GetPlayers()) do pcall(applyHitbox, plr) end
     end
 end)
 
 hitboxBtn.MouseButton1Click:Connect(function()
     hitboxEnabled = not hitboxEnabled
     if hitboxEnabled then
-        hitboxBtn.Text = "📦 HITBOX: ON"
-        hitboxBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        hitboxBtn.Text = "ON"
+        hitboxBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
     else
-        hitboxBtn.Text = "📦 HITBOX: OFF"
-        hitboxBtn.BackgroundColor3 = Color3.fromRGB(150, 50, 150)
+        hitboxBtn.Text = "OFF"
+        hitboxBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
         for _, plr in pairs(Players:GetPlayers()) do
             if plr ~= player and plr.Character then
                 local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
@@ -224,7 +391,7 @@ hitboxBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==================== AI ذكي للعثور على الهدف ====================
+-- ==================== تصويب تلقائي (Aim Assist) ====================
 local function getSmartTarget()
     local bestTarget = nil
     local bestScore = -math.huge
@@ -233,9 +400,8 @@ local function getSmartTarget()
             local hrp = p.Character:FindFirstChild("HumanoidRootPart")
             local hum = p.Character:FindFirstChild("Humanoid")
             if hrp and hum and hum.Health > 0 then
-                local distance = (rootPart.Position - hrp.Position).Magnitude
-                local healthFactor = (hum.Health / hum.MaxHealth) * 10
-                local score = (50 - distance) + (10 - healthFactor)
+                local dist = (rootPart.Position - hrp.Position).Magnitude
+                local score = (50 - dist) + (10 - (hum.Health / hum.MaxHealth) * 10)
                 if score > bestScore then
                     bestScore = score
                     bestTarget = p
@@ -246,7 +412,6 @@ local function getSmartTarget()
     return bestTarget
 end
 
--- ==================== تصويب تلقائي ====================
 local function updateAim()
     if not autoAimEnabled then return end
     local target = getSmartTarget()
@@ -261,182 +426,12 @@ end
 aimBtn.MouseButton1Click:Connect(function()
     autoAimEnabled = not autoAimEnabled
     if autoAimEnabled then
-        aimBtn.Text = "🎯 AUTO AIM: ON"
-        aimBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        aimBtn.Text = "ON"
+        aimBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
     else
-        aimBtn.Text = "🎯 AUTO AIM: OFF"
-        aimBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
+        aimBtn.Text = "OFF"
+        aimBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
     end
-end)
-
--- ==================== ESP ====================
-local function clearESP()
-    for _, obj in pairs(espObjects) do
-        pcall(function()
-            if obj.line then obj.line:Destroy() end
-            if obj.name then obj.name:Destroy() end
-            if obj.bar then obj.bar:Destroy() end
-        end)
-    end
-    espObjects = {}
-end
-
-local function updateESP()
-    if not espEnabled then clearESP() return end
-    local viewX, viewY = Camera.ViewportSize.X, Camera.ViewportSize.Y
-    local centerX = viewX / 2
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= player and not ignoredPlayers[p.Name] and p.Character then
-            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-            local hum = p.Character:FindFirstChild("Humanoid")
-            if hrp and hum and hum.Health > 0 then
-                local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 2, 0))
-                if onScreen and pos.Z > 0 then
-                    if not espObjects[p] then
-                        espObjects[p] = {}
-                        local line = Instance.new("Frame")
-                        line.BackgroundColor3 = Color3.fromRGB(0, 200, 255)
-                        line.BorderSizePixel = 0
-                        line.Parent = espContainer
-                        espObjects[p].line = line
-                        local name = Instance.new("TextLabel")
-                        name.Size = UDim2.new(0, 140, 0, 22)
-                        name.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-                        name.BackgroundTransparency = 0.5
-                        name.TextColor3 = Color3.fromRGB(255, 255, 255)
-                        name.TextSize = 12
-                        name.Font = Enum.Font.GothamBold
-                        name.Parent = espContainer
-                        Instance.new("UICorner", name).CornerRadius = UDim.new(0, 4)
-                        espObjects[p].name = name
-                        local bar = Instance.new("Frame")
-                        bar.Size = UDim2.new(0, 60, 0, 6)
-                        bar.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-                        bar.BorderSizePixel = 0
-                        bar.Parent = espContainer
-                        Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
-                        espObjects[p].bar = bar
-                    end
-                    local esp = espObjects[p]
-                    local healthPercent = hum.Health / hum.MaxHealth
-                    local startY = viewY
-                    local endY = pos.Y
-                    local distance = startY - endY
-                    local angle = math.atan2(endY - startY, pos.X - centerX)
-                    esp.line.Size = UDim2.new(0, 2, 0, math.abs(distance))
-                    esp.line.Position = UDim2.new(0, centerX, 0, endY)
-                    esp.line.Rotation = math.deg(angle)
-                    esp.line.Visible = true
-                    esp.name.Text = "[" .. p.Name .. "]"
-                    esp.name.Position = UDim2.new(0, pos.X - 70, 0, pos.Y - 40)
-                    esp.name.Visible = true
-                    local barWidth = 60 * healthPercent
-                    esp.bar.Size = UDim2.new(0, barWidth, 0, 6)
-                    esp.bar.Position = UDim2.new(0, pos.X - 30, 0, pos.Y - 18)
-                    esp.bar.BackgroundColor3 = Color3.fromRGB(0, 200, 0):Lerp(Color3.fromRGB(200, 0, 0), 1 - healthPercent)
-                    esp.bar.Visible = true
-                else
-                    if espObjects[p] then
-                        if espObjects[p].line then espObjects[p].line.Visible = false end
-                        if espObjects[p].name then espObjects[p].name.Visible = false end
-                        if espObjects[p].bar then espObjects[p].bar.Visible = false end
-                    end
-                end
-            else
-                if espObjects[p] then
-                    pcall(function()
-                        if espObjects[p].line then espObjects[p].line:Destroy() end
-                        if espObjects[p].name then espObjects[p].name:Destroy() end
-                        if espObjects[p].bar then espObjects[p].bar:Destroy() end
-                    end)
-                    espObjects[p] = nil
-                end
-            end
-        end
-    end
-end
-
-espBtn.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    if espEnabled then
-        espBtn.Text = "🔍 ESP: ON"
-        espBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
-    else
-        espBtn.Text = "🔍 ESP: OFF"
-        espBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 200)
-        clearESP()
-    end
-end)
-
--- ==================== قائمة تجاهل اللاعبين ====================
-local selectGui = nil
-ignoreBtn.MouseButton1Click:Connect(function()
-    if selectGui then selectGui:Destroy() selectGui = nil return end
-    selectGui = Instance.new("ScreenGui")
-    selectGui.Name = "SelectPlayer"
-    selectGui.Parent = screenGui
-    local selectFrame = Instance.new("Frame")
-    selectFrame.Size = UDim2.new(0.8, 0, 0, 0.6)
-    selectFrame.Position = UDim2.new(0.1, 0, 0.2, 0)
-    selectFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
-    selectFrame.Draggable = true
-    selectFrame.Parent = selectGui
-    Instance.new("UICorner", selectFrame).CornerRadius = UDim.new(0, 12)
-    local selTitle = Instance.new("TextLabel")
-    selTitle.Size = UDim2.new(1, 0, 0, 40)
-    selTitle.BackgroundColor3 = Color3.fromRGB(200, 100, 50)
-    selTitle.Text = "IGNORE PLAYER"
-    selTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    selTitle.TextSize = 16
-    selTitle.Font = Enum.Font.GothamBold
-    selTitle.Parent = selectFrame
-    Instance.new("UICorner", selTitle).CornerRadius = UDim.new(0, 12)
-    local closeSel = Instance.new("TextButton")
-    closeSel.Size = UDim2.new(0, 35, 0, 35)
-    closeSel.Position = UDim2.new(1, -40, 0, 3)
-    closeSel.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-    closeSel.Text = "X"
-    closeSel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    closeSel.TextSize = 18
-    closeSel.Font = Enum.Font.GothamBold
-    closeSel.Parent = selTitle
-    Instance.new("UICorner", closeSel).CornerRadius = UDim.new(1, 0)
-    closeSel.MouseButton1Click:Connect(function() selectGui:Destroy() selectGui = nil end)
-    local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, -10, 0, -50)
-    scroll.Position = UDim2.new(0, 5, 0, 45)
-    scroll.BackgroundTransparency = 1
-    scroll.ScrollBarThickness = 5
-    scroll.Parent = selectFrame
-    local y = 0
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= player then
-            local btn = Instance.new("TextButton")
-            btn.Size = UDim2.new(1, -10, 0, 45)
-            btn.Position = UDim2.new(0, 5, 0, y)
-            btn.BackgroundColor3 = ignoredPlayers[p.Name] and Color3.fromRGB(0, 120, 40) or Color3.fromRGB(50, 50, 70)
-            btn.Text = p.Name .. (ignoredPlayers[p.Name] and " ✓" or "")
-            btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.TextSize = 14
-            btn.Font = Enum.Font.Gotham
-            btn.TextXAlignment = "Left"
-            btn.Parent = scroll
-            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-            btn.MouseButton1Click:Connect(function()
-                if ignoredPlayers[p.Name] then
-                    ignoredPlayers[p.Name] = nil
-                    btn.BackgroundColor3 = Color3.fromRGB(50, 50, 70)
-                    btn.Text = p.Name
-                else
-                    ignoredPlayers[p.Name] = true
-                    btn.BackgroundColor3 = Color3.fromRGB(0, 120, 40)
-                    btn.Text = p.Name .. " ✓"
-                end
-            end)
-            y = y + 50
-        end
-    end
-    scroll.CanvasSize = UDim2.new(0, 0, 0, y + 20)
 end)
 
 -- ==================== التلبورت ====================
@@ -462,20 +457,20 @@ local function doTeleport()
     local target = getSmartTarget()
     if not target then
         tpButton.Text = "❌"
-        tpButton.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        tpButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
         task.wait(0.5)
         tpButton.Text = "🔮\nTP"
-        tpButton.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+        tpButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
         isTeleporting = false
         return
     end
     local handPos = getHandPos(target)
     if not handPos then
         tpButton.Text = "⚠️"
-        tpButton.BackgroundColor3 = Color3.fromRGB(200, 100, 50)
+        tpButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
         task.wait(0.5)
         tpButton.Text = "🔮\nTP"
-        tpButton.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+        tpButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
         isTeleporting = false
         return
     end
@@ -490,27 +485,26 @@ local function doTeleport()
         task.wait(0.01)
     end
     tpButton.Text = "📍"
-    tpButton.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+    tpButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
     task.wait(0.05)
     if savedPosition then
         teleportTo(savedPosition.Position)
         savedPosition = nil
     end
     tpButton.Text = "🔮\nTP"
-    tpButton.BackgroundColor3 = Color3.fromRGB(30, 40, 60)
+    tpButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     isTeleporting = false
 end
 
--- تفعيل زر التلبورت المنفصل
-tpActivateBtn.MouseButton1Click:Connect(function()
+teleportBtn.MouseButton1Click:Connect(function()
     isTeleportActive = not isTeleportActive
     if isTeleportActive then
-        tpActivateBtn.Text = "🌀 TELEPORT: ON"
-        tpActivateBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 100)
+        teleportBtn.Text = "ON"
+        teleportBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
         tpButton.Visible = true
     else
-        tpActivateBtn.Text = "🌀 ACTIVATE TELEPORT"
-        tpActivateBtn.BackgroundColor3 = Color3.fromRGB(100, 150, 255)
+        teleportBtn.Text = "OFF"
+        teleportBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
         tpButton.Visible = false
     end
 end)
@@ -524,7 +518,7 @@ local menuVisible = true
 toggleBtn.MouseButton1Click:Connect(function()
     menuVisible = not menuVisible
     mainFrame.Visible = menuVisible
-    toggleBtn.Text = menuVisible and "⚡" or "✖"
+    toggleBtn.ImageColor3 = menuVisible and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
 end)
 
 -- ==================== حلقات التحديث ====================
@@ -549,11 +543,4 @@ player.CharacterAdded:Connect(function(newChar)
     end
 end)
 
--- زر الإغلاق في القائمة
-closeBtn.MouseButton1Click:Connect(function()
-    mainFrame.Visible = false
-    menuVisible = false
-    toggleBtn.Text = "✖"
-end)
-
-print("✅ تم تحميل Delta Hub Mobile بالكامل! استمتع!")
+print("🔥 Delta Hub Pro تم تحميله بالكامل! استمتع! 🔥")
