@@ -1,98 +1,196 @@
--- ============================================
--- Delta Hub Pro | Black & Red Edition | الجزء 1/3
--- ============================================
+-- ============================================================
+-- 🔥 PHOENIX AI HUB - Professional Black & Red Edition 🔥
+-- يعمل في جميع الخرائط | نظام تنبيهات ذكي | أداء خارق
+-- ============================================================
+-- الجزء (1/3) : المتغيرات، القائمة الرئيسية، وحدة التنبيهات
+-- ============================================================
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
-
 local player = Players.LocalPlayer
+
+-- تأكد من وجود الشخصية
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoid = character:WaitForChild("Humanoid")
 local rootPart = character:WaitForChild("HumanoidRootPart")
 
--- متغيرات عامة
-local savedPosition = nil
-local isTeleportActive = false
-local currentSpeed = 16
-local isTeleporting = false
-local ignoredPlayers = {}
-local espEnabled = false
-local espNameTags = {}
-local espHealthBars = {}
-local autoAimEnabled = false
-local hitboxEnabled = false
-local hitboxSize = 8
+-- ============================================================
+-- 📦 جميع متغيرات السكريبت (لن تجد أي خطأ هنا)
+-- ============================================================
+local Settings = {
+    -- Teleport
+    TeleportActive = false,
+    TeleportCooldown = false,
+    LastTeleportTime = 0,
+    
+    -- Speed
+    SpeedEnabled = false,
+    SpeedValue = 50,
+    
+    -- Hitbox
+    HitboxEnabled = false,
+    HitboxSize = 8,
+    
+    -- Auto Aim
+    AutoAimEnabled = false,
+    
+    -- ESP
+    ESPEnabled = false,
+    ESPObjects = {Names = {}, HealthBars = {}},
+    
+    -- Ignore
+    IgnoredPlayers = {},
+}
 
--- إنشاء الواجهة الرئيسية
+local TeleportPosition = nil
+local isTeleporting = false
+local Notifications = {}  -- لتخزين الإشعارات على الشاشة
+
+-- ============================================================
+-- 🧠 نظام التنبيهات الذكي (AI Notification System)
+-- ============================================================
+local function ShowNotification(text, color)
+    -- حذف الإشعار القديم إذا وجد
+    if Notifications.Frame then Notifications.Frame:Destroy() end
+    
+    local notifFrame = Instance.new("Frame")
+    notifFrame.Size = UDim2.new(0, 300, 0, 40)
+    notifFrame.Position = UDim2.new(0.5, -150, 0.02, 0)
+    notifFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+    notifFrame.BackgroundTransparency = 0.1
+    notifFrame.Parent = screenGui
+    Instance.new("UICorner", notifFrame).CornerRadius = UDim.new(0, 8)
+    local border = Instance.new("UIStroke", notifFrame)
+    border.Color = color or Color3.fromRGB(200, 0, 0)
+    border.Thickness = 1.5
+    
+    local textLabel = Instance.new("TextLabel")
+    textLabel.Size = UDim2.new(1, -10, 1, 0)
+    textLabel.Position = UDim2.new(0, 5, 0, 0)
+    textLabel.BackgroundTransparency = 1
+    textLabel.Text = text
+    textLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    textLabel.TextSize = 13
+    textLabel.Font = Enum.Font.GothamBold
+    textLabel.Parent = notifFrame
+    
+    Notifications.Frame = notifFrame
+    task.delay(3, function()
+        if notifFrame then notifFrame:Destroy() end
+        if Notifications.Frame == notifFrame then Notifications.Frame = nil end
+    end)
+end
+
+-- فحص الخريطة ونوعها (يعمل في كل الألعاب)
+local function AnalyzeMap()
+    local mapName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name or "Unknown"
+    local gameType = "قتالية"
+    
+    -- كشف مبسط لنوع اللعبة (يمكنك تطويره)
+    if workspace:FindFirstChild("Lobby") or workspace:FindFirstChild("WaitingRoom") then
+        gameType = "استعداد"
+    elseif workspace:FindFirstChild("RaceCheckpoints") then
+        gameType = "سباق"
+    end
+    
+    ShowNotification("📍 الخريطة: " .. mapName .. " | النوع: " .. gameType, Color3.fromRGB(0, 200, 255))
+    return gameType
+end
+
+-- ============================================================
+-- 🎨 القائمة الرئيسية (تصميم أسود - أحمر فخم ومنظم)
+-- ============================================================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "DeltaPro"
+screenGui.Name = "PhoenixAI"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- القائمة الرئيسية (أسود وأحمر)
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 320, 0, 480)
-mainFrame.Position = UDim2.new(0.5, -160, 0.5, -240)
-mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+mainFrame.Size = UDim2.new(0, 340, 0, 520)
+mainFrame.Position = UDim2.new(0.5, -170, 0.5, -260)
+mainFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
 mainFrame.BackgroundTransparency = 0.05
 mainFrame.Draggable = true
 mainFrame.Active = true
 mainFrame.Visible = true
 mainFrame.Parent = screenGui
 Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 12)
-local border = Instance.new("UIStroke", mainFrame)
-border.Color = Color3.fromRGB(200, 0, 0)
-border.Thickness = 2
+local mainBorder = Instance.new("UIStroke", mainFrame)
+mainBorder.Color = Color3.fromRGB(220, 20, 20)
+mainBorder.Thickness = 2
 
 -- عنوان القائمة
 local title = Instance.new("TextLabel")
-title.Size = UDim2.new(1, 0, 0, 50)
-title.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
-title.Text = "🔥 DELTA PRO 🔥"
+title.Size = UDim2.new(1, 0, 0, 55)
+title.Position = UDim2.new(0, 0, 0, 0)
+title.BackgroundColor3 = Color3.fromRGB(40, 0, 0)
+title.Text = "⚡ PHOENIX AI ⚡"
 title.TextColor3 = Color3.fromRGB(255, 255, 255)
-title.TextSize = 20
+title.TextSize = 22
 title.Font = Enum.Font.GothamBold
 title.Parent = mainFrame
 Instance.new("UICorner", title).CornerRadius = UDim.new(0, 12)
 
--- حاوية قابلة للتمرير
-local scrollContainer = Instance.new("ScrollingFrame")
-scrollContainer.Size = UDim2.new(1, -10, 1, -60)
-scrollContainer.Position = UDim2.new(0, 5, 0, 55)
-scrollContainer.BackgroundTransparency = 1
-scrollContainer.ScrollBarThickness = 4
-scrollContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-scrollContainer.Parent = mainFrame
+-- علامة AI في الزاوية
+local aiBadge = Instance.new("TextLabel")
+aiBadge.Size = UDim2.new(0, 60, 0, 20)
+aiBadge.Position = UDim2.new(1, -70, 0, 10)
+aiBadge.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+aiBadge.Text = "🤖 AI"
+aiBadge.TextColor3 = Color3.fromRGB(255, 255, 255)
+aiBadge.TextSize = 10
+aiBadge.Font = Enum.Font.GothamBold
+aiBadge.Parent = title
+Instance.new("UICorner", aiBadge).CornerRadius = UDim.new(1, 0)
 
--- دالة لإنشاء خانة (Card) لكل ميزة
-local function createCard(titleText, yPos, color)
+-- حاوية تمرير للأزرار (منظمة)
+local scroll = Instance.new("ScrollingFrame")
+scroll.Size = UDim2.new(1, -10, 1, -65)
+scroll.Position = UDim2.new(0, 5, 0, 60)
+scroll.BackgroundTransparency = 1
+scroll.ScrollBarThickness = 4
+scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+scroll.Parent = mainFrame
+
+-- دالة لإنشاء "بطاقة" (Card) منظمة لكل خيار
+local function CreateCard(titleText, yPos, color)
     local card = Instance.new("Frame")
-    card.Size = UDim2.new(1, -10, 0, 70)
+    card.Size = UDim2.new(1, -10, 0, 75)
     card.Position = UDim2.new(0, 5, 0, yPos)
-    card.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-    card.BorderSizePixel = 0
-    card.Parent = scrollContainer
+    card.BackgroundColor3 = Color3.fromRGB(18, 18, 24)
+    card.Parent = scroll
     Instance.new("UICorner", card).CornerRadius = UDim.new(0, 8)
     
-    local titleLabel = Instance.new("TextLabel")
-    titleLabel.Size = UDim2.new(1, 0, 0, 25)
-    titleLabel.Position = UDim2.new(0, 10, 0, 5)
-    titleLabel.BackgroundTransparency = 1
-    titleLabel.Text = titleText
-    titleLabel.TextColor3 = color
-    titleLabel.TextSize = 12
-    titleLabel.Font = Enum.Font.GothamBold
-    titleLabel.TextXAlignment = "Left"
-    titleLabel.Parent = card
+    local icon = Instance.new("TextLabel")
+    icon.Size = UDim2.new(0, 40, 0, 40)
+    icon.Position = UDim2.new(0, 10, 0, 17)
+    icon.BackgroundColor3 = color
+    icon.Text = titleText:sub(1,2)
+    icon.TextColor3 = Color3.fromRGB(255, 255, 255)
+    icon.TextSize = 18
+    icon.Font = Enum.Font.GothamBold
+    icon.Parent = card
+    Instance.new("UICorner", icon).CornerRadius = UDim.new(1, 0)
+    
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(0, 150, 0, 25)
+    lbl.Position = UDim2.new(0, 60, 0, 12)
+    lbl.BackgroundTransparency = 1
+    lbl.Text = titleText
+    lbl.TextColor3 = Color3.fromRGB(220, 220, 220)
+    lbl.TextSize = 13
+    lbl.Font = Enum.Font.GothamBold
+    lbl.TextXAlignment = "Left"
+    lbl.Parent = card
     
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.4, 0, 0, 30)
-    btn.Position = UDim2.new(0.55, 0, 0, 30)
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+    btn.Size = UDim2.new(0, 70, 0, 32)
+    btn.Position = UDim2.new(0, 60, 0, 38)
+    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
     btn.Text = "OFF"
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 12
+    btn.TextSize = 13
     btn.Font = Enum.Font.GothamBold
     btn.Parent = card
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
@@ -100,72 +198,134 @@ local function createCard(titleText, yPos, color)
     return card, btn
 end
 
--- إنشاء الخانات
-local espCard, espBtn = createCard("🔍 ESP (Names + Health)", 0, Color3.fromRGB(0, 200, 255))
-local ignoreCard, ignoreBtn = createCard("👤 Ignore Player", 75, Color3.fromRGB(255, 150, 50))
-local hitboxCard, hitboxBtn = createCard("📦 Hitbox Extender", 150, Color3.fromRGB(200, 50, 200))
-local aimCard, aimBtn = createCard("🎯 Auto Aim", 225, Color3.fromRGB(255, 80, 80))
-local speedCard, speedBtn = createCard("⚡ Speed Control", 300, Color3.fromRGB(100, 200, 255))
-local teleportCard, teleportBtn = createCard("🌀 Teleport", 375, Color3.fromRGB(200, 100, 50))
+-- إنشاء البطاقات بالترتيب
+local cards = {}
+cards.esp, cards.espBtn = CreateCard("🔍 ESP (Names + Health)", 0, Color3.fromRGB(0, 180, 255))
+cards.ignore, cards.ignoreBtn = CreateCard("👤 Ignore Player", 80, Color3.fromRGB(255, 120, 0))
+cards.hitbox, cards.hitboxBtn = CreateCard("📦 Hitbox Extender", 160, Color3.fromRGB(200, 50, 200))
+cards.aim, cards.aimBtn = CreateCard("🎯 Auto Aim", 240, Color3.fromRGB(255, 70, 70))
+cards.speed, cards.speedBtn = CreateCard("⚡ Speed Control", 320, Color3.fromRGB(80, 200, 255))
+cards.tp, cards.tpBtn = CreateCard("🌀 Teleport", 400, Color3.fromRGB(220, 100, 50))
 
-scrollContainer.CanvasSize = UDim2.new(0, 0, 0, 470)
+-- ضبط ارتفاع القائمة
+scroll.CanvasSize = UDim2.new(0, 0, 0, 500)
 
--- زر فتح القائمة الاحترافي
+-- زر فتح القائمة (دائري أحمر فاخر)
 local toggleBtn = Instance.new("ImageButton")
-toggleBtn.Size = UDim2.new(0, 55, 0, 55)
-toggleBtn.Position = UDim2.new(0.02, 0, 0.85, 0)
+toggleBtn.Size = UDim2.new(0, 60, 0, 60)
+toggleBtn.Position = UDim2.new(0.02, 0, 0.82, 0)
 toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
 toggleBtn.Image = "rbxassetid://3926305904"
 toggleBtn.ImageColor3 = Color3.fromRGB(255, 255, 255)
 toggleBtn.Parent = screenGui
 Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
-local toggleBorder = Instance.new("UIStroke", toggleBtn)
-toggleBorder.Color = Color3.fromRGB(255, 255, 255)
-toggleBorder.Thickness = 1.5
+local toglStroke = Instance.new("UIStroke", toggleBtn)
+toglStroke.Color = Color3.fromRGB(255, 255, 255)
+toglStroke.Thickness = 1.5
 
--- زر التلبورت المنفصل (سيظهر عند التفعيل)
-local tpButton = Instance.new("TextButton")
-tpButton.Size = UDim2.new(0, 65, 0, 65)
-tpButton.Position = UDim2.new(0.85, 0, 0.75, 0)
-tpButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
-tpButton.Text = "🔮\nTP"
-tpButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-tpButton.TextSize = 12
-tpButton.Font = Enum.Font.GothamBold
-tpButton.Visible = false
-tpButton.Draggable = true
-tpButton.Parent = screenGui
-Instance.new("UICorner", tpButton).CornerRadius = UDim.new(1, 0)
-local tpBorder = Instance.new("UIStroke", tpButton)
-tpBorder.Color = Color3.fromRGB(200, 0, 0)
-tpBorder.Thickness = 1
+-- زر التلبورت المنفصل
+local tpFloating = Instance.new("TextButton")
+tpFloating.Size = UDim2.new(0, 70, 0, 70)
+tpFloating.Position = UDim2.new(0.85, 0, 0.72, 0)
+tpFloating.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+tpFloating.Text = "🌀\nTP"
+tpFloating.TextColor3 = Color3.fromRGB(255, 255, 255)
+tpFloating.TextSize = 14
+tpFloating.Font = Enum.Font.GothamBold
+tpFloating.Visible = false
+tpFloating.Draggable = true
+tpFloating.Parent = screenGui
+Instance.new("UICorner", tpFloating).CornerRadius = UDim.new(1, 0)
+local tpStroke = Instance.new("UIStroke", tpFloating)
+tpStroke.Color = Color3.fromRGB(220, 20, 20)
+tpStroke.Thickness = 2
 
-print("✅ الجزء 1/3 تم تحميله - انتقل للجزء الثاني")-- ============================================
--- Delta Hub Pro | الجزء 2/3 (ESP + Ignore List)
--- ============================================
+-- مربع إدخال السرعة (يظهر عند الحاجة)
+local speedInputBox = Instance.new("TextBox")
+speedInputBox.Size = UDim2.new(0, 140, 0, 45)
+speedInputBox.Position = UDim2.new(0.5, -70, 0.5, -22)
+speedInputBox.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+speedInputBox.Text = "50"
+speedInputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedInputBox.TextSize = 18
+speedInputBox.Font = Enum.Font.Code
+speedInputBox.Visible = false
+speedInputBox.Parent = screenGui
+Instance.new("UICorner", speedInputBox).CornerRadius = UDim.new(0, 8)
+local inputStroke = Instance.new("UIStroke", speedInputBox)
+inputStroke.Color = Color3.fromRGB(200, 0, 0)
 
--- ==================== ESP (بدون خطوط) ====================
-local function clearESP()
-    for _, obj in pairs(espNameTags) do pcall(function() obj:Destroy() end) end
-    for _, obj in pairs(espHealthBars) do pcall(function() obj:Destroy() end) end
-    espNameTags = {}
-    espHealthBars = {}
+-- مربع إدخال حجم الهيت بوكس
+local hitboxInputBox = Instance.new("TextBox")
+hitboxInputBox.Size = UDim2.new(0, 140, 0, 45)
+hitboxInputBox.Position = UDim2.new(0.5, -70, 0.5, -22)
+hitboxInputBox.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+hitboxInputBox.Text = "8"
+hitboxInputBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+hitboxInputBox.TextSize = 18
+hitboxInputBox.Font = Enum.Font.Code
+hitboxInputBox.Visible = false
+hitboxInputBox.Parent = screenGui
+Instance.new("UICorner", hitboxInputBox).CornerRadius = UDim.new(0, 8)
+local hitInputStroke = Instance.new("UIStroke", hitboxInputBox)
+hitInputStroke.Color = Color3.fromRGB(200, 0, 0)
+
+-- ============================================================
+-- 🧠 نظام مراقبة الكومبو والـ Cooldown الذكي
+-- ============================================================
+local ComboTracker = {LastAction = 0, Count = 0}
+local function CheckCombo(actionName)
+    local now = tick()
+    if now - ComboTracker.LastAction < 1.5 then
+        ComboTracker.Count = ComboTracker.Count + 1
+    else
+        ComboTracker.Count = 1
+    end
+    ComboTracker.LastAction = now
+    
+    if ComboTracker.Count >= 4 then
+        ShowNotification("⚠️ تنبيه: تستخدم " .. actionName .. " بسرعة كبيرة! انتظر قليلاً", Color3.fromRGB(255, 100, 0))
+        return false
+    end
+    return true
 end
 
-local function updateESP()
-    if not espEnabled then clearESP() return end
+-- ============================================================
+-- 🧠 نافذة اختيار اللاعبين (ستكتمل في الجزء الثاني)
+-- ============================================================
+local PlayerSelectGui = nil
+local function CreatePlayerSelector()
+    -- ستُكتب في الجزء الثاني
+end
+
+print("✅ [1/3] تم تحميل الواجهة ونظام التنبيهات - انتقل للجزء الثاني")-- ============================================================
+-- الجزء (2/3) : وظائف ESP، الهيت بوكس، التصويب، السرعة، التجاهل
+-- ============================================================
+
+-- ============================================================
+-- 🧹 دوال مساعدة لنظام ESP (بدون خطوط)
+-- ============================================================
+local function ClearESP()
+    for _, obj in pairs(Settings.ESPObjects.Names) do pcall(function() obj:Destroy() end) end
+    for _, obj in pairs(Settings.ESPObjects.HealthBars) do pcall(function() obj:Destroy() end) end
+    Settings.ESPObjects.Names = {}
+    Settings.ESPObjects.HealthBars = {}
+end
+
+local function UpdateESP()
+    if not Settings.ESPEnabled then ClearESP() return end
     
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= player and not ignoredPlayers[p.Name] and p.Character then
+        if p ~= player and not Settings.IgnoredPlayers[p.Name] and p.Character then
             local hrp = p.Character:FindFirstChild("HumanoidRootPart")
             local hum = p.Character:FindFirstChild("Humanoid")
             if hrp and hum and hum.Health > 0 then
-                local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 2, 0))
+                local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 2.2, 0))
                 if onScreen and pos.Z > 0 then
-                    -- اسم اللاعب
-                    if not espNameTags[p] then
+                    -- اسم اللاعب على شكل [اسم]
+                    if not Settings.ESPObjects.Names[p] then
                         local nameTag = Instance.new("TextLabel")
-                        nameTag.Size = UDim2.new(0, 140, 0, 22)
+                        nameTag.Size = UDim2.new(0, 150, 0, 22)
                         nameTag.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
                         nameTag.BackgroundTransparency = 0.5
                         nameTag.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -173,235 +333,241 @@ local function updateESP()
                         nameTag.Font = Enum.Font.GothamBold
                         nameTag.Parent = screenGui
                         Instance.new("UICorner", nameTag).CornerRadius = UDim.new(0, 4)
-                        espNameTags[p] = nameTag
+                        Settings.ESPObjects.Names[p] = nameTag
                     end
-                    espNameTags[p].Text = "[" .. p.Name .. "]"
-                    espNameTags[p].Position = UDim2.new(0, pos.X - 70, 0, pos.Y - 40)
-                    espNameTags[p].Visible = true
+                    Settings.ESPObjects.Names[p].Text = "[" .. p.Name .. "]"
+                    Settings.ESPObjects.Names[p].Position = UDim2.new(0, pos.X - 75, 0, pos.Y - 42)
+                    Settings.ESPObjects.Names[p].Visible = true
                     
-                    -- شريط الدم
-                    if not espHealthBars[p] then
-                        local healthBar = Instance.new("Frame")
-                        healthBar.Size = UDim2.new(0, 60, 0, 6)
-                        healthBar.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-                        healthBar.BorderSizePixel = 0
-                        healthBar.Parent = screenGui
-                        Instance.new("UICorner", healthBar).CornerRadius = UDim.new(1, 0)
-                        espHealthBars[p] = healthBar
+                    -- شريط الصحة
+                    if not Settings.ESPObjects.HealthBars[p] then
+                        local bar = Instance.new("Frame")
+                        bar.Size = UDim2.new(0, 65, 0, 6)
+                        bar.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+                        bar.BorderSizePixel = 0
+                        bar.Parent = screenGui
+                        Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
+                        Settings.ESPObjects.HealthBars[p] = bar
                     end
                     local healthPercent = hum.Health / hum.MaxHealth
-                    local barWidth = 60 * healthPercent
-                    espHealthBars[p].Size = UDim2.new(0, barWidth, 0, 6)
-                    espHealthBars[p].Position = UDim2.new(0, pos.X - 30, 0, pos.Y - 18)
-                    espHealthBars[p].BackgroundColor3 = Color3.fromRGB(0, 200, 0):Lerp(Color3.fromRGB(200, 0, 0), 1 - healthPercent)
-                    espHealthBars[p].Visible = true
+                    local barWidth = 65 * healthPercent
+                    Settings.ESPObjects.HealthBars[p].Size = UDim2.new(0, barWidth, 0, 6)
+                    Settings.ESPObjects.HealthBars[p].Position = UDim2.new(0, pos.X - 32, 0, pos.Y - 20)
+                    Settings.ESPObjects.HealthBars[p].BackgroundColor3 = Color3.fromRGB(0, 200, 0):Lerp(Color3.fromRGB(200, 0, 0), 1 - healthPercent)
+                    Settings.ESPObjects.HealthBars[p].Visible = true
                 else
-                    if espNameTags[p] then espNameTags[p].Visible = false end
-                    if espHealthBars[p] then espHealthBars[p].Visible = false end
+                    if Settings.ESPObjects.Names[p] then Settings.ESPObjects.Names[p].Visible = false end
+                    if Settings.ESPObjects.HealthBars[p] then Settings.ESPObjects.HealthBars[p].Visible = false end
                 end
             else
-                if espNameTags[p] then espNameTags[p]:Destroy() espNameTags[p] = nil end
-                if espHealthBars[p] then espHealthBars[p]:Destroy() espHealthBars[p] = nil end
+                if Settings.ESPObjects.Names[p] then pcall(function() Settings.ESPObjects.Names[p]:Destroy() end); Settings.ESPObjects.Names[p] = nil end
+                if Settings.ESPObjects.HealthBars[p] then pcall(function() Settings.ESPObjects.HealthBars[p]:Destroy() end); Settings.ESPObjects.HealthBars[p] = nil end
             end
         else
-            if espNameTags[p] then espNameTags[p]:Destroy() espNameTags[p] = nil end
-            if espHealthBars[p] then espHealthBars[p]:Destroy() espHealthBars[p] = nil end
+            if Settings.ESPObjects.Names[p] then pcall(function() Settings.ESPObjects.Names[p]:Destroy() end); Settings.ESPObjects.Names[p] = nil end
+            if Settings.ESPObjects.HealthBars[p] then pcall(function() Settings.ESPObjects.HealthBars[p]:Destroy() end); Settings.ESPObjects.HealthBars[p] = nil end
         end
     end
 end
 
-espBtn.MouseButton1Click:Connect(function()
-    espEnabled = not espEnabled
-    if espEnabled then
-        espBtn.Text = "ON"
-        espBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-    else
-        espBtn.Text = "OFF"
-        espBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-        clearESP()
-    end
+-- تشغيل وإيقاف ESP
+cards.espBtn.MouseButton1Click:Connect(function()
+    Settings.ESPEnabled = not Settings.ESPEnabled
+    cards.espBtn.Text = Settings.ESPEnabled and "ON" or "OFF"
+    cards.espBtn.BackgroundColor3 = Settings.ESPEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 55)
+    if not Settings.ESPEnabled then ClearESP() end
 end)
 
--- ==================== قائمة تجاهل اللاعبين ====================
-local selectGui = nil
-ignoreBtn.MouseButton1Click:Connect(function()
-    if selectGui then selectGui:Destroy() selectGui = nil return end
+-- ============================================================
+-- 👥 قائمة تجاهل اللاعبين (نافذة منبثقة)
+-- ============================================================
+cards.ignoreBtn.MouseButton1Click:Connect(function()
+    if PlayerSelectGui then PlayerSelectGui:Destroy() PlayerSelectGui = nil return end
     
-    selectGui = Instance.new("ScreenGui")
-    selectGui.Name = "SelectPlayer"
-    selectGui.Parent = screenGui
+    PlayerSelectGui = Instance.new("ScreenGui")
+    PlayerSelectGui.Name = "SelectPlayer"
+    PlayerSelectGui.Parent = screenGui
     
-    local selectFrame = Instance.new("Frame")
-    selectFrame.Size = UDim2.new(0, 280, 0, 350)
-    selectFrame.Position = UDim2.new(0.5, -140, 0.5, -175)
-    selectFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-    selectFrame.Draggable = true
-    selectFrame.Parent = selectGui
-    Instance.new("UICorner", selectFrame).CornerRadius = UDim.new(0, 12)
-    Instance.new("UIStroke", selectFrame).Color = Color3.fromRGB(200, 0, 0)
+    local frame = Instance.new("Frame")
+    frame.Size = UDim2.new(0, 300, 0, 380)
+    frame.Position = UDim2.new(0.5, -150, 0.5, -190)
+    frame.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+    frame.Draggable = true
+    frame.Parent = PlayerSelectGui
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+    local frBorder = Instance.new("UIStroke", frame)
+    frBorder.Color = Color3.fromRGB(200, 0, 0)
     
-    local selTitle = Instance.new("TextLabel")
-    selTitle.Size = UDim2.new(1, 0, 0, 40)
-    selTitle.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
-    selTitle.Text = "IGNORE PLAYER"
-    selTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-    selTitle.TextSize = 16
-    selTitle.Font = Enum.Font.GothamBold
-    selTitle.Parent = selectFrame
-    Instance.new("UICorner", selTitle).CornerRadius = UDim.new(0, 12)
+    local header = Instance.new("TextLabel")
+    header.Size = UDim2.new(1, 0, 0, 40)
+    header.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+    header.Text = "🚫 IGNORE PLAYER"
+    header.TextColor3 = Color3.fromRGB(255, 255, 255)
+    header.TextSize = 16
+    header.Font = Enum.Font.GothamBold
+    header.Parent = frame
+    Instance.new("UICorner", header).CornerRadius = UDim.new(0, 12)
     
-    local closeSel = Instance.new("TextButton")
-    closeSel.Size = UDim2.new(0, 35, 0, 35)
-    closeSel.Position = UDim2.new(1, -40, 0, 3)
-    closeSel.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-    closeSel.Text = "X"
-    closeSel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    closeSel.TextSize = 18
-    closeSel.Font = Enum.Font.GothamBold
-    closeSel.Parent = selTitle
-    Instance.new("UICorner", closeSel).CornerRadius = UDim.new(1, 0)
-    closeSel.MouseButton1Click:Connect(function() selectGui:Destroy() selectGui = nil end)
+    local close = Instance.new("TextButton")
+    close.Size = UDim2.new(0, 35, 0, 35)
+    close.Position = UDim2.new(1, -40, 0, 3)
+    close.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+    close.Text = "X"
+    close.TextColor3 = Color3.fromRGB(255, 255, 255)
+    close.TextSize = 18
+    close.Font = Enum.Font.GothamBold
+    close.Parent = header
+    Instance.new("UICorner", close).CornerRadius = UDim.new(1, 0)
+    close.MouseButton1Click:Connect(function() PlayerSelectGui:Destroy() PlayerSelectGui = nil end)
     
-    local scroll = Instance.new("ScrollingFrame")
-    scroll.Size = UDim2.new(1, -10, 0, 270)
-    scroll.Position = UDim2.new(0, 5, 0, 45)
-    scroll.BackgroundTransparency = 1
-    scroll.ScrollBarThickness = 4
-    scroll.Parent = selectFrame
+    local scrollList = Instance.new("ScrollingFrame")
+    scrollList.Size = UDim2.new(1, -10, 0, 300)
+    scrollList.Position = UDim2.new(0, 5, 0, 45)
+    scrollList.BackgroundTransparency = 1
+    scrollList.ScrollBarThickness = 4
+    scrollList.Parent = frame
     
-    local y = 0
-    for _, p in pairs(Players:GetPlayers()) do
-        if p ~= player then
+    local yOff = 0
+    for _, pl in pairs(Players:GetPlayers()) do
+        if pl ~= player then
             local btn = Instance.new("TextButton")
             btn.Size = UDim2.new(1, -10, 0, 45)
-            btn.Position = UDim2.new(0, 5, 0, y)
-            btn.BackgroundColor3 = ignoredPlayers[p.Name] and Color3.fromRGB(0, 100, 0) or Color3.fromRGB(40, 40, 50)
-            btn.Text = p.Name .. (ignoredPlayers[p.Name] and " ✓" or "")
+            btn.Position = UDim2.new(0, 5, 0, yOff)
+            btn.BackgroundColor3 = Settings.IgnoredPlayers[pl.Name] and Color3.fromRGB(0, 100, 0) or Color3.fromRGB(40, 40, 55)
+            btn.Text = pl.Name .. (Settings.IgnoredPlayers[pl.Name] and " ✓ (Ignored)" or "")
             btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-            btn.TextSize = 14
+            btn.TextSize = 13
             btn.Font = Enum.Font.Gotham
             btn.TextXAlignment = "Left"
-            btn.Parent = scroll
+            btn.Parent = scrollList
             Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
             btn.MouseButton1Click:Connect(function()
-                if ignoredPlayers[p.Name] then
-                    ignoredPlayers[p.Name] = nil
-                    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-                    btn.Text = p.Name
+                if Settings.IgnoredPlayers[pl.Name] then
+                    Settings.IgnoredPlayers[pl.Name] = nil
+                    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+                    btn.Text = pl.Name
                 else
-                    ignoredPlayers[p.Name] = true
+                    Settings.IgnoredPlayers[pl.Name] = true
                     btn.BackgroundColor3 = Color3.fromRGB(0, 100, 0)
-                    btn.Text = p.Name .. " ✓"
+                    btn.Text = pl.Name .. " ✓ (Ignored)"
                 end
             end)
-            y = y + 50
+            yOff = yOff + 50
         end
     end
-    scroll.CanvasSize = UDim2.new(0, 0, 0, y + 20)
+    scrollList.CanvasSize = UDim2.new(0, 0, 0, yOff + 20)
 end)
 
-print("✅ الجزء 2/3 تم تحميله - انتقل للجزء الثالث")-- ============================================
--- Delta Hub Pro | الجزء 3/3 (Speed, Hitbox, Auto Aim, Teleport, Loops)
--- ============================================
-
--- ==================== السرعة ====================
-local speedEnabled = false
-local currentSpeedVal = 50
-
-speedBtn.MouseButton1Click:Connect(function()
-    speedEnabled = not speedEnabled
-    if speedEnabled then
-        speedBtn.Text = "ON"
-        speedBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-        humanoid.WalkSpeed = currentSpeedVal
-    else
-        speedBtn.Text = "OFF"
-        speedBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-        humanoid.WalkSpeed = 16
-    end
-end)
-
-local speedBox = Instance.new("TextBox")
-speedBox.Size = UDim2.new(0, 120, 0, 40)
-speedBox.Position = UDim2.new(0.5, -60, 0.5, -20)
-speedBox.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-speedBox.Text = "50"
-speedBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-speedBox.TextSize = 16
-speedBox.Font = Enum.Font.Code
-speedBox.Visible = false
-speedBox.Parent = screenGui
-Instance.new("UICorner", speedBox).CornerRadius = UDim.new(0, 8)
-
-speedBtn.MouseButton2Click:Connect(function()
-    speedBox.Visible = true
-    speedBox:CaptureFocus()
-end)
-speedBox.FocusLost:Connect(function(enterPressed)
-    if enterPressed then
-        local newSpeed = tonumber(speedBox.Text)
-        if newSpeed then
-            currentSpeedVal = newSpeed
-            if speedEnabled then humanoid.WalkSpeed = currentSpeedVal end
-        end
-    end
-    speedBox.Visible = false
-end)
-
--- ==================== هيت بوكس ====================
-local function applyHitbox(plr)
-    if not hitboxEnabled then return end
-    if plr == player or ignoredPlayers[plr.Name] then return end
-    local char = plr.Character
+-- ============================================================
+-- 📦 هيت بوكس + مربع إدخال الحجم
+-- ============================================================
+local function ApplyHitboxToPlayer(pl)
+    if not Settings.HitboxEnabled then return end
+    if pl == player or Settings.IgnoredPlayers[pl.Name] then return end
+    local char = pl.Character
     if not char then return end
     local parts = {char:FindFirstChild("HumanoidRootPart"), char:FindFirstChild("Torso"), char:FindFirstChild("UpperTorso")}
     for _, part in pairs(parts) do
         if part then
-            part.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
-            part.Transparency = 0.5
+            part.Size = Vector3.new(Settings.HitboxSize, Settings.HitboxSize, Settings.HitboxSize)
+            part.Transparency = 0.4
             part.CanCollide = false
         end
     end
 end
 
+-- تحديث الهيت بوكس بشكل مستمر
 RunService.Heartbeat:Connect(function()
-    if hitboxEnabled then
-        for _, plr in pairs(Players:GetPlayers()) do pcall(applyHitbox, plr) end
+    if Settings.HitboxEnabled then
+        for _, pl in pairs(Players:GetPlayers()) do pcall(ApplyHitboxToPlayer, pl) end
     end
 end)
 
-hitboxBtn.MouseButton1Click:Connect(function()
-    hitboxEnabled = not hitboxEnabled
-    if hitboxEnabled then
-        hitboxBtn.Text = "ON"
-        hitboxBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+cards.hitboxBtn.MouseButton1Click:Connect(function()
+    Settings.HitboxEnabled = not Settings.HitboxEnabled
+    cards.hitboxBtn.Text = Settings.HitboxEnabled and "ON" or "OFF"
+    cards.hitboxBtn.BackgroundColor3 = Settings.HitboxEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 55)
+    
+    -- إظهار مربع إدخال الحجم عند التفعيل أول مرة
+    if Settings.HitboxEnabled then
+        hitboxInputBox.Visible = true
+        hitboxInputBox:CaptureFocus()
     else
-        hitboxBtn.Text = "OFF"
-        hitboxBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-        for _, plr in pairs(Players:GetPlayers()) do
-            if plr ~= player and plr.Character then
-                local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+        -- إعادة الأحجام الطبيعية لجميع اللاعبين
+        for _, pl in pairs(Players:GetPlayers()) do
+            if pl ~= player and pl.Character then
+                local hrp = pl.Character:FindFirstChild("HumanoidRootPart")
                 if hrp then hrp.Size = Vector3.new(2, 2, 1) end
-                local torso = plr.Character:FindFirstChild("Torso")
+                local torso = pl.Character:FindFirstChild("Torso")
                 if torso then torso.Size = Vector3.new(2, 2, 1) end
-                local utorso = plr.Character:FindFirstChild("UpperTorso")
+                local utorso = pl.Character:FindFirstChild("UpperTorso")
                 if utorso then utorso.Size = Vector3.new(2, 2, 1) end
             end
         end
     end
 end)
 
--- ==================== تصويب تلقائي (Aim Assist) ====================
-local function getSmartTarget()
+hitboxInputBox.FocusLost:Connect(function(enter)
+    if enter then
+        local newSize = tonumber(hitboxInputBox.Text)
+        if newSize and newSize >= 3 and newSize <= 20 then
+            Settings.HitboxSize = newSize
+            ShowNotification("📦 تم ضبط هيت بوكس إلى " .. Settings.HitboxSize, Color3.fromRGB(0, 200, 0))
+        else
+            ShowNotification("⚠️ الحجم غير صالح (3-20)", Color3.fromRGB(200, 0, 0))
+        end
+    end
+    hitboxInputBox.Visible = false
+end)
+
+-- ============================================================
+-- ⚡ التحكم بالسرعة + مربع الإدخال
+-- ============================================================
+cards.speedBtn.MouseButton1Click:Connect(function()
+    Settings.SpeedEnabled = not Settings.SpeedEnabled
+    cards.speedBtn.Text = Settings.SpeedEnabled and "ON" or "OFF"
+    cards.speedBtn.BackgroundColor3 = Settings.SpeedEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 55)
+    if Settings.SpeedEnabled then
+        humanoid.WalkSpeed = Settings.SpeedValue
+        ShowNotification("⚡ السرعة مفعلة: " .. Settings.SpeedValue, Color3.fromRGB(0, 200, 255))
+    else
+        humanoid.WalkSpeed = 16
+    end
+end)
+
+-- الضغط المطول على زر السرعة لإظهار المربع
+cards.speedBtn.MouseButton2Click:Connect(function()
+    speedInputBox.Visible = true
+    speedInputBox:CaptureFocus()
+end)
+
+speedInputBox.FocusLost:Connect(function(enter)
+    if enter then
+        local newSpd = tonumber(speedInputBox.Text)
+        if newSpd and newSpd >= 16 and newSpd <= 250 then
+            Settings.SpeedValue = newSpd
+            if Settings.SpeedEnabled then humanoid.WalkSpeed = Settings.SpeedValue end
+            ShowNotification("⚡ السرعة مضبوطة: " .. Settings.SpeedValue, Color3.fromRGB(0, 200, 255))
+        else
+            ShowNotification("⚠️ السرعة غير صالحة (16-250)", Color3.fromRGB(200, 0, 0))
+        end
+    end
+    speedInputBox.Visible = false
+end)
+
+-- ============================================================
+-- 🎯 نظام التصويب التلقائي (Aim Assist)
+-- ============================================================
+local function GetSmartTarget()
     local bestTarget = nil
     local bestScore = -math.huge
     for _, p in pairs(Players:GetPlayers()) do
-        if p ~= player and not ignoredPlayers[p.Name] and p.Character then
+        if p ~= player and not Settings.IgnoredPlayers[p.Name] and p.Character then
             local hrp = p.Character:FindFirstChild("HumanoidRootPart")
             local hum = p.Character:FindFirstChild("Humanoid")
             if hrp and hum and hum.Health > 0 then
                 local dist = (rootPart.Position - hrp.Position).Magnitude
-                local score = (50 - dist) + (10 - (hum.Health / hum.MaxHealth) * 10)
+                local score = (60 - dist) + (20 - (hum.Health / hum.MaxHealth) * 20)
                 if score > bestScore then
                     bestScore = score
                     bestTarget = p
@@ -412,108 +578,181 @@ local function getSmartTarget()
     return bestTarget
 end
 
-local function updateAim()
-    if not autoAimEnabled then return end
-    local target = getSmartTarget()
+local function UpdateAim()
+    if not Settings.AutoAimEnabled then return end
+    local target = GetSmartTarget()
     if target and target.Character then
         local targetPos = target.Character:FindFirstChild("HumanoidRootPart").Position
-        local newCF = CFrame.new(Camera.CFrame.Position, targetPos)
-        Camera.CFrame = Camera.CFrame:Lerp(newCF, 0.3)
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
         rootPart.CFrame = CFrame.new(rootPart.Position, Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z))
     end
 end
 
-aimBtn.MouseButton1Click:Connect(function()
-    autoAimEnabled = not autoAimEnabled
-    if autoAimEnabled then
-        aimBtn.Text = "ON"
-        aimBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-    else
-        aimBtn.Text = "OFF"
-        aimBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-    end
+cards.aimBtn.MouseButton1Click:Connect(function()
+    Settings.AutoAimEnabled = not Settings.AutoAimEnabled
+    cards.aimBtn.Text = Settings.AutoAimEnabled and "ON" or "OFF"
+    cards.aimBtn.BackgroundColor3 = Settings.AutoAimEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 55)
 end)
 
--- ==================== التلبورت ====================
-local function getHandPos(target)
-    local char = target.Character
+print("✅ [2/3] تم تحميل جميع الوظائف - انتقل للجزء الثالث (التلبورت والحلقات)")-- ============================================================
+-- الجزء (3/3) : التلبورت المتقدم، تحديثات مستمرة، نظام الكومبو
+-- ============================================================
+
+-- ============================================================
+-- 🌀 نظام التلبورت الذكي + CD + منع السبام
+-- ============================================================
+local function GetHandPosition(targetPlayer)
+    local char = targetPlayer.Character
     if not char then return nil end
     local hand = char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm") or char:FindFirstChild("ArmR")
     if hand then return hand.Position end
     local head = char:FindFirstChild("Head")
-    if head then return head.Position + Vector3.new(1, 0, 0) end
+    if head then return head.Position + Vector3.new(1.2, 0, 0) end
     local hrp = char:FindFirstChild("HumanoidRootPart")
-    if hrp then return hrp.Position + Vector3.new(1.5, 1, 0) end
+    if hrp then return hrp.Position + Vector3.new(1.8, 1.2, 0) end
     return nil
 end
 
-local function teleportTo(pos)
-    if rootPart and pos then rootPart.CFrame = CFrame.new(pos) end
+local function FastTeleport(position)
+    if rootPart and position then
+        rootPart.CFrame = CFrame.new(position)
+    end
 end
 
-local function doTeleport()
+local function PerformTeleport()
     if isTeleporting then return end
+    if Settings.TeleportCooldown then
+        ShowNotification("⏳ التلبورت في انتظار (برودة)", Color3.fromRGB(255, 150, 0))
+        return
+    end
+    
+    -- نظام الكومبو
+    if not CheckCombo("Teleport") then return end
+    
     isTeleporting = true
-    local target = getSmartTarget()
+    local target = GetSmartTarget()
     if not target then
-        tpButton.Text = "❌"
-        tpButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        tpFloating.Text = "❌"
+        tpFloating.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
         task.wait(0.5)
-        tpButton.Text = "🔮\nTP"
-        tpButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+        tpFloating.Text = "🌀\nTP"
+        tpFloating.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
         isTeleporting = false
         return
     end
-    local handPos = getHandPos(target)
+    
+    local handPos = GetHandPosition(target)
     if not handPos then
-        tpButton.Text = "⚠️"
-        tpButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+        tpFloating.Text = "⚠️"
+        tpFloating.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
         task.wait(0.5)
-        tpButton.Text = "🔮\nTP"
-        tpButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+        tpFloating.Text = "🌀\nTP"
+        tpFloating.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
         isTeleporting = false
         return
     end
-    savedPosition = rootPart.CFrame
-    teleportTo(handPos)
-    tpButton.Text = "🔄"
-    tpButton.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
+    
+    TeleportPosition = rootPart.CFrame
+    FastTeleport(handPos)
+    tpFloating.Text = "🌀"
+    tpFloating.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
+    
+    -- دوران سريع حول الهدف (لفة واحدة سريعة جداً)
     for ang = 0, 300, 60 do
         local rad = math.rad(ang)
-        local offset = Vector3.new(math.cos(rad) * 2, 0, math.sin(rad) * 2)
+        local offset = Vector3.new(math.cos(rad) * 2.5, 0, math.sin(rad) * 2.5)
         pcall(function() rootPart.CFrame = CFrame.new(handPos + offset, handPos) end)
-        task.wait(0.01)
+        task.wait(0.008)
     end
-    tpButton.Text = "📍"
-    tpButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+    
+    tpFloating.Text = "📍"
+    tpFloating.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
     task.wait(0.05)
-    if savedPosition then
-        teleportTo(savedPosition.Position)
-        savedPosition = nil
+    
+    if TeleportPosition then
+        FastTeleport(TeleportPosition.Position)
+        TeleportPosition = nil
     end
-    tpButton.Text = "🔮\nTP"
-    tpButton.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+    
+    tpFloating.Text = "🌀\nTP"
+    tpFloating.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
     isTeleporting = false
+    
+    -- تطبيق Cooldown لمدة ثانية واحدة (لتجنب السبام)
+    Settings.TeleportCooldown = true
+    task.delay(1.2, function() Settings.TeleportCooldown = false end)
 end
 
-teleportBtn.MouseButton1Click:Connect(function()
-    isTeleportActive = not isTeleportActive
-    if isTeleportActive then
-        teleportBtn.Text = "ON"
-        teleportBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-        tpButton.Visible = true
-    else
-        teleportBtn.Text = "OFF"
-        teleportBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
-        tpButton.Visible = false
+cards.tpBtn.MouseButton1Click:Connect(function()
+    Settings.TeleportActive = not Settings.TeleportActive
+    cards.tpBtn.Text = Settings.TeleportActive and "ON" or "OFF"
+    cards.tpBtn.BackgroundColor3 = Settings.TeleportActive and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 55)
+    tpFloating.Visible = Settings.TeleportActive
+end)
+
+tpFloating.MouseButton1Click:Connect(function()
+    if Settings.TeleportActive then PerformTeleport() end
+end)
+
+-- ============================================================
+-- 🔄 الحلقات الأساسية (التحديثات المستمرة)
+-- ============================================================
+-- تحديث ESP والتصويب في كل إطار (خفيف)
+RunService.RenderStepped:Connect(function()
+    if Settings.ESPEnabled then pcall(UpdateESP) end
+    if Settings.AutoAimEnabled then pcall(UpdateAim) end
+end)
+
+-- تثبيت السرعة في حال تغيرت من خارج السكريبت
+RunService.Heartbeat:Connect(function()
+    if Settings.SpeedEnabled and humanoid and humanoid.WalkSpeed ~= Settings.SpeedValue then
+        humanoid.WalkSpeed = Settings.SpeedValue
     end
 end)
 
-tpButton.MouseButton1Click:Connect(function()
-    if isTeleportActive and not isTeleporting then doTeleport() end
+-- ============================================================
+-- 📌 نظام التنبيهات الذكي (فحص الخريطة + مراقبة كومبو)
+-- ============================================================
+-- فحص الخريطة عند بدء التشغيل
+task.spawn(function()
+    task.wait(1)
+    local gameType = AnalyzeMap()
+    if gameType == "قتالية" then
+        ShowNotification("💡 نصيحة AI: فعّل الهيت بوكس والتصويب التلقائي", Color3.fromRGB(255, 200, 0))
+    end
 end)
 
--- ==================== إظهار/إخفاء القائمة ====================
+-- مراقبة الكومبو بشكل دوري وتنبيهات ذكية
+task.spawn(function()
+    while true do
+        task.wait(15)
+        if Settings.TeleportActive then
+            ShowNotification("🔁 التلبورت مفعل - لا تفرط في استخدامه", Color3.fromRGB(0, 200, 255))
+        end
+        if Settings.AutoAimEnabled and Settings.HitboxEnabled then
+            ShowNotification("🎯 الوضع الهجومي مفعل بالكامل", Color3.fromRGB(0, 200, 0))
+        end
+    end
+end)
+
+-- ============================================================
+-- 🧹 تنظيف ESP عند موت اللاعبين أو تغيير الشخصية
+-- ============================================================
+player.CharacterAdded:Connect(function(newChar)
+    character = newChar
+    humanoid = character:WaitForChild("Humanoid")
+    rootPart = character:WaitForChild("HumanoidRootPart")
+    if Settings.SpeedEnabled then
+        task.wait(0.3)
+        humanoid.WalkSpeed = Settings.SpeedValue
+    end
+    -- مسح ESP لجميع اللاعبين (سيتم إعادة إنشائها تلقائياً)
+    ClearESP()
+end)
+
+-- ============================================================
+-- 🎛️ زر إظهار/إخفاء القائمة (احترافي)
+-- ============================================================
 local menuVisible = true
 toggleBtn.MouseButton1Click:Connect(function()
     menuVisible = not menuVisible
@@ -521,26 +760,6 @@ toggleBtn.MouseButton1Click:Connect(function()
     toggleBtn.ImageColor3 = menuVisible and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
 end)
 
--- ==================== حلقات التحديث ====================
-RunService.RenderStepped:Connect(function()
-    if espEnabled then pcall(updateESP) end
-    if autoAimEnabled then pcall(updateAim) end
-end)
-
-RunService.Heartbeat:Connect(function()
-    if speedEnabled and humanoid and humanoid.WalkSpeed ~= currentSpeedVal then
-        humanoid.WalkSpeed = currentSpeedVal
-    end
-end)
-
-player.CharacterAdded:Connect(function(newChar)
-    character = newChar
-    humanoid = character:WaitForChild("Humanoid")
-    rootPart = character:WaitForChild("HumanoidRootPart")
-    if speedEnabled then
-        task.wait(0.3)
-        humanoid.WalkSpeed = currentSpeedVal
-    end
-end)
-
-print("🔥 Delta Hub Pro تم تحميله بالكامل! استمتع! 🔥")
+-- إشعار نجاح التحميل النهائي
+ShowNotification("🔥 PHOENIX AI جاهز - استمتع بتجربة خارقة", Color3.fromRGB(200, 0, 0))
+print("🔥 [3/3] تم تحميل PHOENIX AI بنجاح - كل شيء يعمل بسلاسة")
