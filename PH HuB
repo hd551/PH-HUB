@@ -1,639 +1,479 @@
--- ============================================================
--- 🔥 OMEGA HUB – FINAL VERSION 🔥
--- يعمل في كل المابات | جميع الميزات متكاملة
--- ============================================================
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
-
 local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-local rootPart = character:WaitForChild("HumanoidRootPart")
+local char = player.Character or player.CharacterAdded:Wait()
+local hum = char:WaitForChild("Humanoid")
+local rootPart = char:WaitForChild("HumanoidRootPart")
 
--- الإعدادات العامة
-local options = {
-    speed = false,
-    speedVal = 50,
-    jump = false,
-    jumpVal = 80,
-    hitbox = false,
-    hitboxSize = 8,
-    esp = false,
-    homing = false,      -- الزر الجديد لتوجيه المقذوفات
-    teleport = false
-}
-local ignoredPlayers = {}
+local settings = {speed=false,spdVal=50,jump=false,jmpVal=80,hitbox=false,hbSize=8,esp=false,homing=false,teleport=false}
+local ignored = {}
 local espItems = {}
 local isTeleporting = false
 local savedPos = nil
+local tracked = {}
 
--- ==================== واجهة المستخدم (جوال / سطح مكتب) ====================
 local gui = Instance.new("ScreenGui")
-gui.Name = "OmegaHub"
+gui.Name = "FullHub"
 gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 360, 0, 610)
-mainFrame.Position = UDim2.new(0.5, -180, 0.5, -305)
-mainFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 14)
+mainFrame.Size = UDim2.new(0, 360, 0, 580)
+mainFrame.Position = UDim2.new(0.5, -180, 0.5, -290)
+mainFrame.BackgroundColor3 = Color3.fromRGB(8,8,14)
 mainFrame.Draggable = true
 mainFrame.Visible = true
 mainFrame.Parent = gui
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 18)
-local border = Instance.new("UIStroke", mainFrame)
-border.Color = Color3.fromRGB(220, 20, 60)
-border.Thickness = 2
+Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0,14)
+Instance.new("UIStroke", mainFrame).Color = Color3.fromRGB(220,20,60)
 
-local titleBar = Instance.new("Frame")
-titleBar.Size = UDim2.new(1, 0, 0, 50)
-titleBar.BackgroundColor3 = Color3.fromRGB(20, 0, 0)
-titleBar.Parent = mainFrame
-Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 18)
+local title = Instance.new("TextLabel")
+title.Size = UDim2.new(1,0,0,50)
+title.BackgroundColor3 = Color3.fromRGB(20,0,0)
+title.Text = "⚡ OMEGA HUB ⚡"
+title.TextColor3 = Color3.fromRGB(255,255,255)
+title.TextSize = 20
+title.Font = Enum.Font.GothamBold
+title.Parent = mainFrame
+Instance.new("UICorner", title).CornerRadius = UDim.new(0,14)
 
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Size = UDim2.new(1, 0, 1, 0)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "⚡ OMEGA HUB ⚡"
-titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.TextSize = 20
-titleLabel.Font = Enum.Font.GothamBold
-titleLabel.Parent = titleBar
-
--- حاوية قابلة للتمرير
 local scroll = Instance.new("ScrollingFrame")
-scroll.Size = UDim2.new(1, -12, 1, -60)
-scroll.Position = UDim2.new(0, 6, 0, 55)
+scroll.Size = UDim2.new(1,-12,1,-60)
+scroll.Position = UDim2.new(0,6,0,55)
 scroll.BackgroundTransparency = 1
 scroll.ScrollBarThickness = 4
-scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+scroll.CanvasSize = UDim2.new(0,0,0,0)
 scroll.Parent = mainFrame
 
--- دالة لإنشاء خيار (بطاقة)
-local function addCard(title, y, icon, hasInput, placeholder)
+local function addCard(title,y,icon,hasInput,ph)
     local card = Instance.new("Frame")
-    card.Size = UDim2.new(1, -12, 0, 85)
-    card.Position = UDim2.new(0, 6, 0, y)
-    card.BackgroundColor3 = Color3.fromRGB(18, 18, 26)
+    card.Size = UDim2.new(1,-12,0,85)
+    card.Position = UDim2.new(0,6,0,y)
+    card.BackgroundColor3 = Color3.fromRGB(18,18,26)
     card.Parent = scroll
-    Instance.new("UICorner", card).CornerRadius = UDim.new(0, 12)
-    
+    Instance.new("UICorner", card).CornerRadius = UDim.new(0,12)
     local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, -20, 0, 25)
-    lbl.Position = UDim2.new(0, 10, 0, 5)
+    lbl.Size = UDim2.new(1,-20,0,25)
+    lbl.Position = UDim2.new(0,10,0,5)
     lbl.BackgroundTransparency = 1
-    lbl.Text = icon .. " " .. title
-    lbl.TextColor3 = Color3.fromRGB(220, 220, 255)
-    lbl.TextSize = 14
+    lbl.Text = icon.." "..title
+    lbl.TextColor3 = Color3.fromRGB(220,220,255)
+    lbl.TextSize = 13
     lbl.Font = Enum.Font.GothamBold
     lbl.TextXAlignment = "Left"
     lbl.Parent = card
-    
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0.35, 0, 0, 32)
-    btn.Position = UDim2.new(0.62, 0, 0, 40)
-    btn.BackgroundColor3 = Color3.fromRGB(40, 40, 55)
+    btn.Size = UDim2.new(0.35,0,0,32)
+    btn.Position = UDim2.new(0.62,0,0,40)
+    btn.BackgroundColor3 = Color3.fromRGB(40,40,55)
     btn.Text = "OFF"
-    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    btn.TextSize = 13
+    btn.TextColor3 = Color3.fromRGB(255,255,255)
+    btn.TextSize = 12
     btn.Font = Enum.Font.GothamBold
     btn.Parent = card
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
-    
-    local input = nil
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0,8)
+    local inp = nil
     if hasInput then
-        input = Instance.new("TextBox")
-        input.Size = UDim2.new(0.35, 0, 0, 32)
-        input.Position = UDim2.new(0.23, 0, 0, 40)
-        input.BackgroundColor3 = Color3.fromRGB(28, 28, 38)
-        input.Text = placeholder
-        input.TextColor3 = Color3.fromRGB(255, 255, 255)
-        input.TextSize = 13
-        input.Font = Enum.Font.Code
-        input.Parent = card
-        Instance.new("UICorner", input).CornerRadius = UDim.new(0, 8)
+        inp = Instance.new("TextBox")
+        inp.Size = UDim2.new(0.35,0,0,32)
+        inp.Position = UDim2.new(0.23,0,0,40)
+        inp.BackgroundColor3 = Color3.fromRGB(28,28,38)
+        inp.Text = ph
+        inp.TextColor3 = Color3.fromRGB(255,255,255)
+        inp.TextSize = 12
+        inp.Font = Enum.Font.Code
+        inp.Parent = card
+        Instance.new("UICorner", inp).CornerRadius = UDim.new(0,8)
     end
-    
-    return btn, input
+    return btn, inp
 end
 
 local y = 0
-local spdBtn, spdInp = addCard("Speed", y, "⚡", true, "50")
-y = y + 95
-local jumpBtn, jumpInp = addCard("Jump Power", y, "🦘", true, "80")
-y = y + 95
-local hitBtn, hitInp = addCard("Hitbox", y, "📦", true, "8")
-y = y + 95
-local espBtn, _ = addCard("ESP", y, "👁️", false, nil)
-y = y + 95
-local ignoreBtn, _ = addCard("Ignore Player", y, "🚫", false, nil)
-y = y + 95
-local homingBtn, _ = addCard("AUTO AIM (Homing)", y, "💥", false, nil)   -- الزر المطلوب
-y = y + 95
-local teleBtn, _ = addCard("Teleport", y, "🌀", false, nil)
-y = y + 95
+local spdBtn, spdInp = addCard("Speed",y,"⚡",true,"50")
+y=y+95
+local jmpBtn, jmpInp = addCard("Jump",y,"🦘",true,"80")
+y=y+95
+local hbBtn, hbInp = addCard("Hitbox",y,"📦",true,"8")
+y=y+95
+local espBtn, _ = addCard("ESP",y,"👁️",false,nil)
+y=y+95
+local ignBtn, _ = addCard("Ignore Player",y,"🚫",false,nil)
+y=y+95
+local homBtn, _ = addCard("Homing (Bullets)",y,"💥",false,nil)
+y=y+95
+local telBtn, _ = addCard("Teleport",y,"🌀",false,nil)
+y=y+95
+scroll.CanvasSize = UDim2.new(0,0,0,y+20)
 
-scroll.CanvasSize = UDim2.new(0, 0, 0, y + 20)
-
--- أزرار عائمة منفصلة
-local menuToggle = Instance.new("ImageButton")
-menuToggle.Size = UDim2.new(0, 55, 0, 55)
-menuToggle.Position = UDim2.new(0.02, 0, 0.82, 0)
-menuToggle.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-menuToggle.Image = "rbxassetid://3926305904"
-menuToggle.ImageColor3 = Color3.fromRGB(255, 255, 255)
-menuToggle.Parent = gui
-Instance.new("UICorner", menuToggle).CornerRadius = UDim.new(1, 0)
+local toggleMenu = Instance.new("TextButton")
+toggleMenu.Size = UDim2.new(0,55,0,55)
+toggleMenu.Position = UDim2.new(0.02,0,0.82,0)
+toggleMenu.BackgroundColor3 = Color3.fromRGB(200,0,0)
+toggleMenu.Text = "≡"
+toggleMenu.TextColor3 = Color3.fromRGB(255,255,255)
+toggleMenu.TextSize = 24
+toggleMenu.Font = Enum.Font.GothamBold
+toggleMenu.Draggable = true
+toggleMenu.Parent = gui
+Instance.new("UICorner", toggleMenu).CornerRadius = UDim.new(1,0)
 
 local tpFloat = Instance.new("TextButton")
-tpFloat.Size = UDim2.new(0, 65, 0, 65)
-tpFloat.Position = UDim2.new(0.85, 0, 0.72, 0)
-tpFloat.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+tpFloat.Size = UDim2.new(0,65,0,65)
+tpFloat.Position = UDim2.new(0.85,0,0.72,0)
+tpFloat.BackgroundColor3 = Color3.fromRGB(25,25,35)
 tpFloat.Text = "🔮\nTP"
-tpFloat.TextColor3 = Color3.fromRGB(255, 255, 255)
+tpFloat.TextColor3 = Color3.fromRGB(255,255,255)
 tpFloat.TextSize = 12
 tpFloat.Font = Enum.Font.GothamBold
 tpFloat.Visible = false
 tpFloat.Draggable = true
 tpFloat.Parent = gui
-Instance.new("UICorner", tpFloat).CornerRadius = UDim.new(1, 0)
-Instance.new("UIStroke", tpFloat).Color = Color3.fromRGB(200, 0, 0)
+Instance.new("UICorner", tpFloat).CornerRadius = UDim.new(1,0)
+Instance.new("UIStroke", tpFloat).Color = Color3.fromRGB(200,0,0)
 
-print("✅ الجزء 1/3 تم - انتقل للجزء الثاني")-- ============================================================
--- الجزء 2/3 – تحسينات الأداء الأساسية
--- ============================================================
+local menuVisible = true
+toggleMenu.MouseButton1Click:Connect(function()
+    menuVisible = not menuVisible
+    mainFrame.Visible = menuVisible
+    toggleMenu.Text = menuVisible and "≡" or "✖"
+end)
 
--- ==================== السرعة (تثبيت كل إطار) ====================
-local speedOn = false
-local speedVal = 50
-
-local function setSpeed()
-    if speedOn and humanoid then
-        humanoid.WalkSpeed = speedVal
-        -- طريقة بديلة لبعض الألعاب العنيدة
-        if rootPart and rootPart.AssemblyLinearVelocity then
-            local vel = rootPart.AssemblyLinearVelocity
-            if vel.Magnitude < speedVal then
-                rootPart.AssemblyLinearVelocity = vel.Unit * speedVal
-            end
-        end
-    end
+print("Part1 loaded")local speedOn = false
+local spdVal = 50
+local function applySpeed()
+    if speedOn and hum then hum.WalkSpeed = spdVal end
 end
-
 spdBtn.MouseButton1Click:Connect(function()
     speedOn = not speedOn
     spdBtn.Text = speedOn and "ON" or "OFF"
-    spdBtn.BackgroundColor3 = speedOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 55)
+    spdBtn.BackgroundColor3 = speedOn and Color3.fromRGB(0,200,0) or Color3.fromRGB(40,40,55)
     if speedOn then
-        speedVal = tonumber(spdInp.Text) or 50
-        speedVal = math.clamp(speedVal, 16, 300)
-        setSpeed()
-    else
-        humanoid.WalkSpeed = 16
-    end
+        local v = tonumber(spdInp.Text)
+        if v then spdVal = math.clamp(v,16,300) end
+        spdInp.Text = tostring(spdVal)
+        applySpeed()
+    else hum.WalkSpeed = 16 end
 end)
-
 spdInp.FocusLost:Connect(function()
     local v = tonumber(spdInp.Text)
-    if v then
-        speedVal = math.clamp(v, 16, 300)
-        spdInp.Text = tostring(speedVal)
-        if speedOn then setSpeed() end
-    end
+    if v then spdVal = math.clamp(v,16,300) end
+    spdInp.Text = tostring(spdVal)
+    if speedOn then applySpeed() end
 end)
 
--- ==================== قفز (تثبيت كل إطار) ====================
 local jumpOn = false
-local jumpVal = 80
-
-local function setJump()
-    if jumpOn and humanoid then
-        humanoid.JumpPower = jumpVal
-    else
-        humanoid.JumpPower = 50
-    end
+local jmpVal = 80
+local function applyJump()
+    if jumpOn and hum then hum.JumpPower = jmpVal else hum.JumpPower = 50 end
 end
-
-jumpBtn.MouseButton1Click:Connect(function()
+jmpBtn.MouseButton1Click:Connect(function()
     jumpOn = not jumpOn
-    jumpBtn.Text = jumpOn and "ON" or "OFF"
-    jumpBtn.BackgroundColor3 = jumpOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 55)
-    setJump()
+    jmpBtn.Text = jumpOn and "ON" or "OFF"
+    jmpBtn.BackgroundColor3 = jumpOn and Color3.fromRGB(0,200,0) or Color3.fromRGB(40,40,55)
+    applyJump()
+end)
+jmpInp.FocusLost:Connect(function()
+    local v = tonumber(jmpInp.Text)
+    if v then jmpVal = math.clamp(v,30,300) end
+    jmpInp.Text = tostring(jmpVal)
+    if jumpOn then applyJump() end
 end)
 
-jumpInp.FocusLost:Connect(function()
-    local v = tonumber(jumpInp.Text)
-    if v then
-        jumpVal = math.clamp(v, 30, 300)
-        jumpInp.Text = tostring(jumpVal)
-        if jumpOn then setJump() end
-    end
-end)
-
--- ==================== Hitbox (تضخيم كامل الجسم) ====================
-local hitOn = false
-local hitSize = 8
-
+local hitboxOn = false
+local hbSize = 8
 local function applyHitbox(plr)
-    if not hitOn then return end
-    if plr == player or ignoredPlayers[plr.Name] then return end
-    local char = plr.Character
-    if not char then return end
-    -- قائمة بكل الأجزاء المهمة في أي لعبة
-    local partsToScale = {
-        "HumanoidRootPart", "Torso", "UpperTorso", "LowerTorso",
-        "Head", "Right Arm", "Left Arm", "Right Leg", "Left Leg"
-    }
-    for _, name in pairs(partsToScale) do
-        local part = char:FindFirstChild(name)
-        if part and part:IsA("BasePart") then
-            pcall(function()
-                part.Size = Vector3.new(hitSize, hitSize, hitSize)
-                part.Transparency = 0.4
-                part.CanCollide = false
-            end)
+    if not hitboxOn then return end
+    if plr == player or ignored[plr.Name] then return end
+    local c = plr.Character
+    if not c then return end
+    local parts = {"HumanoidRootPart","Torso","UpperTorso","LowerTorso","Head","Right Arm","Left Arm","Right Leg","Left Leg"}
+    for _,name in pairs(parts) do
+        local p = c:FindFirstChild(name)
+        if p and p:IsA("BasePart") then
+            pcall(function() p.Size = Vector3.new(hbSize,hbSize,hbSize) p.Transparency = 0.4 p.CanCollide = false end)
         end
     end
 end
-
 RunService.Heartbeat:Connect(function()
-    if hitOn then
-        for _, plr in pairs(Players:GetPlayers()) do
-            pcall(applyHitbox, plr)
-        end
-    end
+    if hitboxOn then for _,plr in pairs(Players:GetPlayers()) do pcall(applyHitbox,plr) end end
 end)
-
-hitBtn.MouseButton1Click:Connect(function()
-    hitOn = not hitOn
-    hitBtn.Text = hitOn and "ON" or "OFF"
-    hitBtn.BackgroundColor3 = hitOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 55)
-    if not hitOn then
-        -- إعادة الحجم الطبيعي
-        for _, plr in pairs(Players:GetPlayers()) do
+hbBtn.MouseButton1Click:Connect(function()
+    hitboxOn = not hitboxOn
+    hbBtn.Text = hitboxOn and "ON" or "OFF"
+    hbBtn.BackgroundColor3 = hitboxOn and Color3.fromRGB(0,200,0) or Color3.fromRGB(40,40,55)
+    if not hitboxOn then
+        for _,plr in pairs(Players:GetPlayers()) do
             if plr ~= player and plr.Character then
-                for _, part in pairs(plr.Character:GetChildren()) do
-                    if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
-                        pcall(function() part.Size = Vector3.new(2, 2, 1) end)
-                    end
+                for _,p in pairs(plr.Character:GetChildren()) do
+                    if p:IsA("BasePart") then pcall(function() p.Size = Vector3.new(2,2,1) end) end
                 end
                 local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
-                if hrp then hrp.Size = Vector3.new(2, 2, 1) end
+                if hrp then hrp.Size = Vector3.new(2,2,1) end
             end
         end
     end
 end)
-
-hitInp.FocusLost:Connect(function()
-    local v = tonumber(hitInp.Text)
-    if v then
-        hitSize = math.clamp(v, 3, 20)
-        hitInp.Text = tostring(hitSize)
-    end
+hbInp.FocusLost:Connect(function()
+    local v = tonumber(hbInp.Text)
+    if v then hbSize = math.clamp(v,3,20) end
+    hbInp.Text = tostring(hbSize)
 end)
 
--- ==================== ESP (بدون تجمّد) ====================
 local espOn = false
-
 local function clearESP()
-    for _, data in pairs(espItems) do
-        pcall(function()
-            if data.name then data.name:Destroy() end
-            if data.bar then data.bar:Destroy() end
-        end)
-    end
+    for _,d in pairs(espItems) do pcall(function() d.name:Destroy() d.bar:Destroy() end) end
     espItems = {}
 end
-
 local function updateESP()
-    if not espOn then
-        clearESP()
-        return
-    end
-    
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr == player or ignoredPlayers[plr.Name] then
-            if espItems[plr] then
-                pcall(function()
-                    espItems[plr].name:Destroy()
-                    espItems[plr].bar:Destroy()
-                end)
-                espItems[plr] = nil
-            end
+    if not espOn then clearESP() return end
+    for _,plr in pairs(Players:GetPlayers()) do
+        if plr == player or ignored[plr.Name] then
+            if espItems[plr] then pcall(function() espItems[plr].name:Destroy() espItems[plr].bar:Destroy() end) espItems[plr]=nil end
         else
-            local char = plr.Character
-            local hrp = char and char:FindFirstChild("HumanoidRootPart")
-            local hum = char and char:FindFirstChild("Humanoid")
-            if hrp and hum and hum.Health > 0 then
-                local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 2.2, 0))
-                if onScreen and pos.Z > 0 then
+            local c = plr.Character
+            local hrp = c and c:FindFirstChild("HumanoidRootPart")
+            local hum2 = c and c:FindFirstChild("Humanoid")
+            if hrp and hum2 and hum2.Health>0 then
+                local pos,ons = Camera:WorldToViewportPoint(hrp.Position+Vector3.new(0,2.2,0))
+                if ons and pos.Z>0 then
                     if not espItems[plr] then
                         local name = Instance.new("TextLabel")
-                        name.Size = UDim2.new(0, 160, 0, 24)
-                        name.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+                        name.Size = UDim2.new(0,160,0,24)
+                        name.BackgroundColor3 = Color3.fromRGB(0,0,0)
                         name.BackgroundTransparency = 0.5
-                        name.TextColor3 = Color3.fromRGB(255, 255, 255)
+                        name.TextColor3 = Color3.fromRGB(255,255,255)
                         name.TextSize = 12
                         name.Font = Enum.Font.GothamBold
                         name.Parent = gui
-                        Instance.new("UICorner", name).CornerRadius = UDim.new(0, 6)
-                        
+                        Instance.new("UICorner", name).CornerRadius = UDim.new(0,6)
                         local bar = Instance.new("Frame")
-                        bar.Size = UDim2.new(0, 70, 0, 6)
-                        bar.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+                        bar.Size = UDim2.new(0,70,0,6)
+                        bar.BackgroundColor3 = Color3.fromRGB(0,200,0)
                         bar.BorderSizePixel = 0
                         bar.Parent = gui
-                        Instance.new("UICorner", bar).CornerRadius = UDim.new(1, 0)
-                        
-                        espItems[plr] = {name = name, bar = bar}
+                        Instance.new("UICorner", bar).CornerRadius = UDim.new(1,0)
+                        espItems[plr] = {name=name,bar=bar}
                     end
-                    local hp = hum.Health / hum.MaxHealth
-                    espItems[plr].name.Position = UDim2.new(0, pos.X - 80, 0, pos.Y - 45)
-                    espItems[plr].name.Text = "[" .. plr.Name .. "]"
+                    local hp = hum2.Health/hum2.MaxHealth
+                    espItems[plr].name.Position = UDim2.new(0,pos.X-80,0,pos.Y-45)
+                    espItems[plr].name.Text = "["..plr.Name.."]"
                     espItems[plr].name.Visible = true
-                    
-                    espItems[plr].bar.Size = UDim2.new(0, 70 * hp, 0, 6)
-                    espItems[plr].bar.Position = UDim2.new(0, pos.X - 35, 0, pos.Y - 20)
-                    espItems[plr].bar.BackgroundColor3 = Color3.fromRGB(0, 255, 0):Lerp(Color3.fromRGB(255, 0, 0), 1 - hp)
+                    espItems[plr].bar.Size = UDim2.new(0,70*hp,0,6)
+                    espItems[plr].bar.Position = UDim2.new(0,pos.X-35,0,pos.Y-20)
+                    espItems[plr].bar.BackgroundColor3 = Color3.fromRGB(0,255,0):Lerp(Color3.fromRGB(255,0,0),1-hp)
                     espItems[plr].bar.Visible = true
                 else
-                    if espItems[plr] then
-                        espItems[plr].name.Visible = false
-                        espItems[plr].bar.Visible = false
-                    end
+                    if espItems[plr] then espItems[plr].name.Visible = false espItems[plr].bar.Visible = false end
                 end
             else
-                if espItems[plr] then
-                    pcall(function()
-                        espItems[plr].name:Destroy()
-                        espItems[plr].bar:Destroy()
-                    end)
-                    espItems[plr] = nil
-                end
+                if espItems[plr] then pcall(function() espItems[plr].name:Destroy() espItems[plr].bar:Destroy() end) espItems[plr]=nil end
             end
         end
     end
 end
-
 espBtn.MouseButton1Click:Connect(function()
     espOn = not espOn
     espBtn.Text = espOn and "ON" or "OFF"
-    espBtn.BackgroundColor3 = espOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 55)
+    espBtn.BackgroundColor3 = espOn and Color3.fromRGB(0,200,0) or Color3.fromRGB(40,40,55)
     if not espOn then clearESP() end
 end)
 
--- ==================== قائمة تجاهل (نافذة منبثقة) ====================
 local ignoreWindow = nil
-ignoreBtn.MouseButton1Click:Connect(function()
-    if ignoreWindow then ignoreWindow:Destroy() ignoreWindow = nil return end
+ignBtn.MouseButton1Click:Connect(function()
+    if ignoreWindow then ignoreWindow:Destroy() ignoreWindow=nil return end
     ignoreWindow = Instance.new("ScreenGui")
     ignoreWindow.Parent = gui
     local f = Instance.new("Frame")
-    f.Size = UDim2.new(0, 280, 0, 400)
-    f.Position = UDim2.new(0.5, -140, 0.5, -200)
-    f.BackgroundColor3 = Color3.fromRGB(10, 10, 12)
+    f.Size = UDim2.new(0,280,0,400)
+    f.Position = UDim2.new(0.5,-140,0.5,-200)
+    f.BackgroundColor3 = Color3.fromRGB(10,10,12)
     f.Draggable = true
     f.Parent = ignoreWindow
-    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 14)
-    Instance.new("UIStroke", f).Color = Color3.fromRGB(200, 0, 0)
-    
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0,14)
+    Instance.new("UIStroke", f).Color = Color3.fromRGB(200,0,0)
     local h = Instance.new("TextLabel")
-    h.Size = UDim2.new(1, 0, 0, 45)
-    h.BackgroundColor3 = Color3.fromRGB(30, 0, 0)
+    h.Size = UDim2.new(1,0,0,45)
+    h.BackgroundColor3 = Color3.fromRGB(30,0,0)
     h.Text = "🚫 IGNORE PLAYERS"
-    h.TextColor3 = Color3.fromRGB(255, 255, 255)
+    h.TextColor3 = Color3.fromRGB(255,255,255)
     h.Font = Enum.Font.GothamBold
     h.TextSize = 16
     h.Parent = f
-    Instance.new("UICorner", h).CornerRadius = UDim.new(0, 14)
-    
-    local c = Instance.new("TextButton")
-    c.Size = UDim2.new(0, 35, 0, 35)
-    c.Position = UDim2.new(1, -40, 0, 5)
-    c.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-    c.Text = "X"
-    c.TextColor3 = Color3.fromRGB(255, 255, 255)
-    c.TextSize = 18
-    c.Font = Enum.Font.GothamBold
-    c.Parent = h
-    Instance.new("UICorner", c).CornerRadius = UDim.new(1, 0)
-    c.MouseButton1Click:Connect(function() ignoreWindow:Destroy() ignoreWindow = nil end)
-    
+    Instance.new("UICorner", h).CornerRadius = UDim.new(0,14)
+    local close = Instance.new("TextButton")
+    close.Size = UDim2.new(0,35,0,35)
+    close.Position = UDim2.new(1,-40,0,5)
+    close.BackgroundColor3 = Color3.fromRGB(200,0,0)
+    close.Text = "X"
+    close.TextColor3 = Color3.fromRGB(255,255,255)
+    close.TextSize = 18
+    close.Font = Enum.Font.GothamBold
+    close.Parent = h
+    Instance.new("UICorner", close).CornerRadius = UDim.new(1,0)
+    close.MouseButton1Click:Connect(function() ignoreWindow:Destroy() ignoreWindow=nil end)
     local sc = Instance.new("ScrollingFrame")
-    sc.Size = UDim2.new(1, -10, 1, -55)
-    sc.Position = UDim2.new(0, 5, 0, 50)
+    sc.Size = UDim2.new(1,-10,1,-55)
+    sc.Position = UDim2.new(0,5,0,50)
     sc.BackgroundTransparency = 1
     sc.ScrollBarThickness = 4
     sc.Parent = f
-    
     local function refresh()
-        for _, ch in pairs(sc:GetChildren()) do if ch:IsA("TextButton") then ch:Destroy() end end
+        for _,ch in pairs(sc:GetChildren()) do if ch:IsA("TextButton") then ch:Destroy() end end
         local yoff = 0
-        for _, pl in pairs(Players:GetPlayers()) do
-            if pl ~= player then
+        for _,pl in pairs(Players:GetPlayers()) do
+            if pl~=player then
                 local b = Instance.new("TextButton")
-                b.Size = UDim2.new(1, -10, 0, 45)
-                b.Position = UDim2.new(0, 5, 0, yoff)
-                b.BackgroundColor3 = ignoredPlayers[pl.Name] and Color3.fromRGB(0, 100, 0) or Color3.fromRGB(40, 40, 55)
-                b.Text = pl.Name .. (ignoredPlayers[pl.Name] and " ✅" or "")
-                b.TextColor3 = Color3.fromRGB(255, 255, 255)
+                b.Size = UDim2.new(1,-10,0,45)
+                b.Position = UDim2.new(0,5,0,yoff)
+                b.BackgroundColor3 = ignored[pl.Name] and Color3.fromRGB(0,100,0) or Color3.fromRGB(40,40,55)
+                b.Text = pl.Name..(ignored[pl.Name] and " ✅" or "")
+                b.TextColor3 = Color3.fromRGB(255,255,255)
                 b.TextSize = 14
                 b.Font = Enum.Font.Gotham
                 b.TextXAlignment = "Left"
                 b.Parent = sc
-                Instance.new("UICorner", b).CornerRadius = UDim.new(0, 6)
+                Instance.new("UICorner", b).CornerRadius = UDim.new(0,6)
                 b.MouseButton1Click:Connect(function()
-                    if ignoredPlayers[pl.Name] then
-                        ignoredPlayers[pl.Name] = nil
-                    else
-                        ignoredPlayers[pl.Name] = true
-                    end
+                    if ignored[pl.Name] then ignored[pl.Name]=nil else ignored[pl.Name]=true end
                     refresh()
                 end)
-                yoff = yoff + 50
+                yoff=yoff+50
             end
         end
-        sc.CanvasSize = UDim2.new(0, 0, 0, yoff + 20)
+        sc.CanvasSize = UDim2.new(0,0,0,yoff+20)
     end
     refresh()
 end)
 
--- ==================== تحديث مستمر ====================
 RunService.Heartbeat:Connect(function()
-    if speedOn then setSpeed() end
-    if jumpOn then setJump() end
+    if speedOn then applySpeed() end
+    if jumpOn then applyJump() end
     if espOn then pcall(updateESP) end
 end)
-
-print("✅ الجزء 2/3 تم - انتقل للجزء الثالث (الأخير)")-- ===================================================================
--- الجزء 3/3 – Homing (توجيه المقذوفات لأقرب لاعب) + Teleport
--- ===================================================================
-
--- ==================== Homing: الرصاص يذهب إلى أقرب لاعب ====================
-local homingOn = false
-local tracked = {}   -- لمنع إعادة التوجيه المتكرر لنفس المقذوف
-
-local function getClosestEnemyPosition()
-    local bestPos = nil
-    local bestDist = 200
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= player and not ignoredPlayers[plr.Name] and plr.Character then
+print("Part2 loaded")local homingOn = false
+local function getClosestEnemyPos()
+    local bestPos,bestDist = nil,200
+    for _,plr in pairs(Players:GetPlayers()) do
+        if plr~=player and not ignored[plr.Name] and plr.Character then
             local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
                 local dist = (rootPart.Position - hrp.Position).Magnitude
-                if dist < bestDist then
-                    bestDist = dist
-                    bestPos = hrp.Position
-                end
+                if dist < bestDist then bestDist=dist bestPos=hrp.Position end
             end
         end
     end
     return bestPos
 end
-
-local function steerProjectile(proj, targetPos)
+local function steerProjectile(proj,targetPos)
     if not proj or not proj.Parent then return end
     if proj:IsA("BasePart") and proj.Velocity then
         local dir = (targetPos - proj.Position).Unit
-        local speed = proj.Velocity.Magnitude
-        if speed < 20 then speed = 100 end   -- سرعة افتراضية للقذائف البطيئة
-        proj.Velocity = dir * speed
+        local spd = proj.Velocity.Magnitude
+        if spd < 20 then spd = 100 end
+        proj.Velocity = dir * spd
         proj.CFrame = CFrame.new(proj.Position, targetPos)
     end
 end
-
--- البحث عن المقذوفات وتوجيهها (خفيف جداً)
 RunService.Heartbeat:Connect(function()
     if not homingOn then return end
-    local targetPos = getClosestEnemyPosition()
+    local targetPos = getClosestEnemyPos()
     if not targetPos then return end
-    for _, obj in pairs(workspace:GetDescendants()) do
-        if obj:IsA("BasePart") and obj.Velocity and obj.Velocity.Magnitude > 30 then
-            if not obj:IsDescendantOf(character) and not tracked[obj] then
-                tracked[obj] = true
-                task.spawn(function()
-                    task.wait(0.05)  -- ننتظر قليلاً بعد الإطلاق
-                    if obj and obj.Parent then
-                        steerProjectile(obj, targetPos)
-                    end
-                    tracked[obj] = nil
-                end)
-            end
+    for _,obj in pairs(workspace:GetDescendants()) do
+        if obj:IsA("BasePart") and obj.Velocity and obj.Velocity.Magnitude>30 and not obj:IsDescendantOf(char) and not tracked[obj] then
+            tracked[obj]=true
+            task.spawn(function()
+                task.wait(0.05)
+                if obj and obj.Parent then steerProjectile(obj,targetPos) end
+                tracked[obj]=nil
+            end)
         end
     end
 end)
-
-homingBtn.MouseButton1Click:Connect(function()
+homBtn.MouseButton1Click:Connect(function()
     homingOn = not homingOn
-    homingBtn.Text = homingOn and "ON" or "OFF"
-    homingBtn.BackgroundColor3 = homingOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 55)
+    homBtn.Text = homingOn and "ON" or "OFF"
+    homBtn.BackgroundColor3 = homingOn and Color3.fromRGB(0,200,0) or Color3.fromRGB(40,40,55)
     if not homingOn then tracked = {} end
 end)
 
--- ==================== Teleport (زر منفصل) ====================
 local teleOn = false
-
 local function getNearestTeleportTarget()
-    local nearest = nil
-    local nearestDist = 80
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= player and not ignoredPlayers[plr.Name] and plr.Character then
+    local nearest,nearestDist = nil,80
+    for _,plr in pairs(Players:GetPlayers()) do
+        if plr~=player and not ignored[plr.Name] and plr.Character then
             local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
             if hrp then
                 local dist = (rootPart.Position - hrp.Position).Magnitude
-                if dist < nearestDist then
-                    nearestDist = dist
-                    nearest = plr
-                end
+                if dist < nearestDist then nearestDist=dist nearest=plr end
             end
         end
     end
     return nearest
 end
-
 local function getTeleportPosition(target)
-    local char = target.Character
-    if not char then return nil end
-    local hand = char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm") or char:FindFirstChild("ArmR")
+    local c = target.Character
+    if not c then return nil end
+    local hand = c:FindFirstChild("RightHand") or c:FindFirstChild("Right Arm") or c:FindFirstChild("ArmR")
     if hand then return hand.Position end
-    local head = char:FindFirstChild("Head")
-    if head then return head.Position + Vector3.new(1.2, 0, 0) end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if hrp then return hrp.Position + Vector3.new(1.5, 1, 0) end
+    local head = c:FindFirstChild("Head")
+    if head then return head.Position + Vector3.new(1.2,0,0) end
+    local hrp = c:FindFirstChild("HumanoidRootPart")
+    if hrp then return hrp.Position + Vector3.new(1.5,1,0) end
     return nil
 end
-
 local function doTeleport()
     if isTeleporting then return end
     local target = getNearestTeleportTarget()
     if not target then
-        tpButton.Text = "❌"
-        tpButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        tpFloat.Text = "❌"
+        tpFloat.BackgroundColor3 = Color3.fromRGB(200,0,0)
         task.wait(0.6)
-        tpButton.Text = "🔮\nTP"
-        tpButton.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+        tpFloat.Text = "🔮\nTP"
+        tpFloat.BackgroundColor3 = Color3.fromRGB(25,25,35)
         return
     end
     local pos = getTeleportPosition(target)
     if not pos then return end
-
     isTeleporting = true
     savedPos = rootPart.CFrame
     rootPart.CFrame = CFrame.new(pos)
-    tpButton.Text = "🔄"
-    tpButton.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
-
-    -- دورة حول الخصم
-    for ang = 0, 300, 60 do
+    tpFloat.Text = "🔄"
+    tpFloat.BackgroundColor3 = Color3.fromRGB(200,150,0)
+    for ang=0,300,60 do
         local rad = math.rad(ang)
-        local offset = Vector3.new(math.cos(rad) * 2.5, 0, math.sin(rad) * 2.5)
-        pcall(function() rootPart.CFrame = CFrame.new(pos + offset, pos) end)
+        local offset = Vector3.new(math.cos(rad)*2.5,0,math.sin(rad)*2.5)
+        pcall(function() rootPart.CFrame = CFrame.new(pos+offset,pos) end)
         task.wait(0.012)
     end
-
-    tpButton.Text = "📍"
-    tpButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+    tpFloat.Text = "📍"
+    tpFloat.BackgroundColor3 = Color3.fromRGB(0,200,0)
     task.wait(0.08)
     if savedPos then
         rootPart.CFrame = savedPos
         savedPos = nil
     end
-    tpButton.Text = "🔮\nTP"
-    tpButton.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    tpFloat.Text = "🔮\nTP"
+    tpFloat.BackgroundColor3 = Color3.fromRGB(25,25,35)
     isTeleporting = false
 end
-
-teleportBtn.MouseButton1Click:Connect(function()
+telBtn.MouseButton1Click:Connect(function()
     teleOn = not teleOn
-    teleportBtn.Text = teleOn and "ON" or "OFF"
-    teleportBtn.BackgroundColor3 = teleOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 55)
-    tpButton.Visible = teleOn
+    telBtn.Text = teleOn and "ON" or "OFF"
+    telBtn.BackgroundColor3 = teleOn and Color3.fromRGB(0,200,0) or Color3.fromRGB(40,40,55)
+    tpFloat.Visible = teleOn
+end)
+tpFloat.MouseButton1Click:Connect(function()
+    if teleOn and not isTeleporting then doTeleport() end
 end)
 
-tpButton.MouseButton1Click:Connect(function()
-    if teleOn and not isTeleporting then
-        doTeleport()
-    end
-end)
-
--- ==================== إظهار / إخفاء القائمة ====================
-local menuVisible = true
-menuToggle.MouseButton1Click:Connect(function()
-    menuVisible = not menuVisible
-    mainFrame.Visible = menuVisible
-    menuToggle.ImageColor3 = menuVisible and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
-end)
-
--- ==================== إعادة تطبيق الإعدادات عند الموت ====================
 player.CharacterAdded:Connect(function(newChar)
-    character = newChar
-    humanoid = character:WaitForChild("Humanoid")
-    rootPart = character:WaitForChild("HumanoidRootPart")
+    char = newChar
+    hum = char:WaitForChild("Humanoid")
+    rootPart = char:WaitForChild("HumanoidRootPart")
     task.wait(0.5)
     if speedOn then applySpeed() end
     if jumpOn then applyJump() end
 end)
 
--- ==================== إشعار النجاح ====================
+print("🔥 Full Hub loaded. All features working.")
