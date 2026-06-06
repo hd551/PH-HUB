@@ -1,12 +1,13 @@
 -- ============================================================
--- 🔥 DELTA 2026 ULTIMATE V2 | BLACK/RED EDITION 🔥
--- الجزء 1/3: واجهة المستخدم، الأزرار، المتغيرات
+-- 🔥 DELTA 2026 ULTIMATE V3 | PROJECTILE HOMING + ALL FEATURES 🔥
+-- الجزء 1/3: الواجهة، الأزرار، المتغيرات الأساسية
 -- ============================================================
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 local UserInputService = game:GetService("UserInputService")
+local PhysicsService = game:GetService("PhysicsService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
@@ -22,26 +23,26 @@ local settings = {
     hitboxEnabled = false,
     hitboxSize = 8,
     espEnabled = false,
-    aimlockActive = false,   -- زر التصويب المؤقت (زر منفصل)
+    homingEnabled = false,   -- الزر الجديد: توجيه المقذوفات
     teleportActive = false
 }
-
 local ignoredPlayers = {}
-local espObjects = {}       -- هيكل لتخزين عناصر ESP لكل لاعب
+local espElements = {}      -- { [player] = {name, bar} }
+local homingProjectiles = {} -- قائمة المقذوفات التي يتم توجيهها
 local lastTeleportTime = 0
 local savedPosition = nil
 local isTeleporting = false
 
 -- ==================== إنشاء الواجهة الرئيسية ====================
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "Delta2026V2"
+screenGui.Name = "Delta2026V3"
 screenGui.ResetOnSpawn = false
 screenGui.Parent = player:WaitForChild("PlayerGui")
 
--- القاعدة الرئيسية (تصميم 2026)
+-- القاعدة الرئيسية
 local mainFrame = Instance.new("Frame")
-mainFrame.Size = UDim2.new(0, 360, 0, 580)
-mainFrame.Position = UDim2.new(0.5, -180, 0.5, -290)
+mainFrame.Size = UDim2.new(0, 360, 0, 620)
+mainFrame.Position = UDim2.new(0.5, -180, 0.5, -310)
 mainFrame.BackgroundColor3 = Color3.fromRGB(8, 8, 14)
 mainFrame.BackgroundTransparency = 0.08
 mainFrame.Draggable = true
@@ -63,7 +64,7 @@ Instance.new("UICorner", titleBar).CornerRadius = UDim.new(0, 18)
 local titleLabel = Instance.new("TextLabel")
 titleLabel.Size = UDim2.new(1, 0, 1, 0)
 titleLabel.BackgroundTransparency = 1
-titleLabel.Text = "⚡ DELTA 2026 V2 ⚡"
+titleLabel.Text = "⚡ DELTA 2026 V3 ⚡"
 titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
 titleLabel.TextSize = 20
 titleLabel.Font = Enum.Font.GothamBold
@@ -131,7 +132,7 @@ local function createCard(title, yPos, icon, hasInput, placeholder)
     return toggleBtn, inputBox
 end
 
--- إنشاء البطاقات (جميع الميزات)
+-- إنشاء البطاقات
 local yOffset = 0
 local speedBtn, speedInput = createCard("Speed", yOffset, "⚡", true, "50")
 yOffset = yOffset + 98
@@ -142,6 +143,8 @@ yOffset = yOffset + 98
 local espBtn, _ = createCard("ESP (Names + Health)", yOffset, "👁️", false, nil)
 yOffset = yOffset + 98
 local ignoreBtn, _ = createCard("Ignore Player", yOffset, "🚫", false, nil)
+yOffset = yOffset + 98
+local homingBtn, _ = createCard("Projectile Homing", yOffset, "💥", false, nil)  -- الزر الجديد
 yOffset = yOffset + 98
 local teleportToggleBtn, _ = createCard("Teleport Button", yOffset, "🌀", false, nil)
 yOffset = yOffset + 98
@@ -179,24 +182,8 @@ local tpStroke = Instance.new("UIStroke", tpFloatingBtn)
 tpStroke.Color = Color3.fromRGB(200, 0, 0)
 tpStroke.Thickness = 1.5
 
--- زر التصويب التلقائي المؤقت (Aimlock Temporary)
-local aimlockBtn = Instance.new("TextButton")
-aimlockBtn.Size = UDim2.new(0, 70, 0, 70)
-aimlockBtn.Position = UDim2.new(0.75, 0, 0.82, 0)
-aimlockBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 0)
-aimlockBtn.Text = "🎯\nLOCK"
-aimlockBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-aimlockBtn.TextSize = 12
-aimlockBtn.Font = Enum.Font.GothamBold
-aimlockBtn.Draggable = true
-aimlockBtn.Parent = screenGui
-Instance.new("UICorner", aimlockBtn).CornerRadius = UDim.new(1, 0)
-local aimStroke = Instance.new("UIStroke", aimlockBtn)
-aimStroke.Color = Color3.fromRGB(255, 255, 0)
-aimStroke.Thickness = 1.5
-
 print("✅ الجزء 1/3: الواجهة والأزرار جاهزة - انتقل للجزء الثاني")-- ============================================================
--- الجزء 2/3: السرعة، القفز، الهيت بوكس، ESP (مع تحديث لحظي لحل التجمّد)
+-- الجزء 2/3: تطبيقات السرعة، القفز، الهيت بوكس، ESP المثبت، تجاهل
 -- ============================================================
 
 -- ==================== السرعة (تثبيت دوري) ====================
@@ -233,7 +220,7 @@ speedInput.FocusLost:Connect(function()
     end
 end)
 
--- ==================== قوة القفز (تثبيت دوري) ====================
+-- ==================== قوة القفز (تثبيت دوري قوي) ====================
 local jumpEnabled = false
 local currentJump = 80
 
@@ -320,9 +307,8 @@ hitboxInput.FocusLost:Connect(function()
     end
 end)
 
--- ==================== ESP محسّن (بدون تجمّد أبداً) ====================
+-- ==================== ESP محسّن (بدون تجمّد) ====================
 local espEnabled = false
-local espElements = {}   -- { [player] = {name, bar} }
 
 local function destroyESPForPlayer(plr)
     local data = espElements[plr]
@@ -346,9 +332,6 @@ local function updateESP()
         return
     end
     
-    local viewport = Camera.ViewportSize
-    local centerX = viewport.X / 2
-    
     for _, plr in pairs(Players:GetPlayers()) do
         if plr == player or ignoredPlayers[plr.Name] then
             if espElements[plr] then destroyESPForPlayer(plr) end
@@ -361,9 +344,7 @@ local function updateESP()
         
         if hrp and hum and hum.Health > 0 then
             local screenPos, onScreen = Camera:WorldToViewportPoint(hrp.Position + Vector3.new(0, 2.2, 0))
-            
             if onScreen and screenPos.Z > 0 then
-                -- إنشاء العناصر إذا لم تكن موجودة
                 if not espElements[plr] then
                     local nameTag = Instance.new("TextLabel")
                     nameTag.Size = UDim2.new(0, 160, 0, 24)
@@ -387,10 +368,7 @@ local function updateESP()
                 
                 local healthPercent = hum.Health / hum.MaxHealth
                 local barWidth = 70 * healthPercent
-                local x = screenPos.X - 80
-                local y = screenPos.Y - 45
-                
-                espElements[plr].name.Position = UDim2.new(0, x, 0, y)
+                espElements[plr].name.Position = UDim2.new(0, screenPos.X - 80, 0, screenPos.Y - 45)
                 espElements[plr].name.Text = "[" .. plr.Name .. "]"
                 espElements[plr].name.Visible = true
                 
@@ -405,10 +383,7 @@ local function updateESP()
                 end
             end
         else
-            -- اللاعب غير موجود أو مات => حذف ESP
-            if espElements[plr] then
-                destroyESPForPlayer(plr)
-            end
+            if espElements[plr] then destroyESPForPlayer(plr) end
         end
     end
 end
@@ -420,8 +395,12 @@ espBtn.MouseButton1Click:Connect(function()
     if not espEnabled then clearAllESP() end
 end)
 
--- ==================== قائمة تجاهل اللاعبين (كما هي لكن محسنة) ====================
--- (نفس الكود السابق لكن سنعيد استخدامه)
+-- تحديث ESP كل إطار
+RunService.RenderStepped:Connect(function()
+    if espEnabled then pcall(updateESP) end
+end)
+
+-- ==================== قائمة تجاهل اللاعبين ====================
 local ignoreGui = nil
 ignoreBtn.MouseButton1Click:Connect(function()
     if ignoreGui then ignoreGui:Destroy() ignoreGui = nil return end
@@ -502,63 +481,88 @@ ignoreBtn.MouseButton1Click:Connect(function()
     refreshIgnoreUI()
 end)
 
-print("✅ الجزء 2/3: تم تفعيل السرعة، القفز، الهيت بوكس، وESP بدون تجمّد")-- ============================================================
--- الجزء 3/3: Aimlock (زر منفصل لتوجيه الرصاص) + Teleport + حلقات التثبيت
+print("✅ الجزء 2/3: السرعة، القفز، الهيت بوكس، وESP جاهزة")-- ============================================================
+-- الجزء 3/3: Projectile Homing (توجيه الرصاص للاعب) + Teleport + تثبيت السرعة والقفز
 -- ============================================================
 
--- ==================== Aimlock المؤقت (بالضغط على الزر) ====================
-local aimlockActive = false
-local aimlockDuration = 0.8   -- مدة التصويب التلقائي عند الضغط
+-- ==================== Projectile Homing (الميزة الجديدة) ====================
+local homingEnabled = false
+local trackedProjectiles = {}  -- تجنب تكرار التتبع
 
--- دالة الحصول على أقرب لاعب (مع تجاهل المتجاهلين)
-local function getClosestTarget()
-    local closest = nil
-    local closestDist = 80
+-- دالة الحصول على أقرب هدف (مع تجاهل المتجاهلين)
+local function getNearestEnemyPosition()
+    local nearestPos = nil
+    local nearestDist = 150  -- مدى التوجيه
     for _, plr in pairs(Players:GetPlayers()) do
         if plr ~= player and not ignoredPlayers[plr.Name] and plr.Character then
             local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
-            if hrp and rootPart then
+            if hrp then
                 local dist = (rootPart.Position - hrp.Position).Magnitude
-                if dist < closestDist then
-                    closestDist = dist
-                    closest = plr
+                if dist < nearestDist then
+                    nearestDist = dist
+                    nearestPos = hrp.Position
                 end
             end
         end
     end
-    return closest
+    return nearestPos
 end
 
--- وظيفة التصويب (توجيه الكاميرا واللاعب نحو الهدف)
-local function lockOntoTarget(target)
-    if not target or not target.Character then return end
-    local targetPart = target.Character:FindFirstChild("HumanoidRootPart")
-    if not targetPart then return end
-    local targetPos = targetPart.Position
-    -- توجيه الكاميرا بسلاسة
-    local newCamCF = CFrame.new(Camera.CFrame.Position, targetPos)
-    Camera.CFrame = newCamCF
-    -- توجيه جسم اللاعب
-    rootPart.CFrame = CFrame.new(rootPart.Position, Vector3.new(targetPos.X, rootPart.Position.Y, targetPos.Z))
+-- وظيفة توجيه المقذوفات (تعديل اتجاه السرعة)
+local function redirectProjectile(projectile, targetPos)
+    if not projectile or not projectile.Parent then return end
+    if projectile:IsA("BasePart") and projectile.Velocity then
+        local direction = (targetPos - projectile.Position).Unit
+        local speed = projectile.Velocity.Magnitude
+        if speed < 10 then speed = 100 end  -- سرعة افتراضية للرصاص البطيء
+        local newVelocity = direction * speed
+        projectile.Velocity = newVelocity
+        -- أيضًا نعدل الـ CFrame لجعل الواجهة تتجه نحو الهدف
+        projectile.CFrame = CFrame.new(projectile.Position, targetPos)
+    end
 end
 
--- عند الضغط على زر التصويب
-aimlockBtn.MouseButton1Click:Connect(function()
-    local target = getClosestTarget()
-    if target then
-        lockOntoTarget(target)
-        -- إشارة بصرية
-        aimlockBtn.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
-        task.wait(0.2)
-        aimlockBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 0)
-    else
-        aimlockBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-        task.wait(0.2)
-        aimlockBtn.BackgroundColor3 = Color3.fromRGB(200, 80, 0)
+-- حلقة البحث عن المقذوفات وتوجيهها
+RunService.Heartbeat:Connect(function()
+    if not homingEnabled then return end
+    
+    local targetPos = getNearestEnemyPosition()
+    if not targetPos then return end
+    
+    -- البحث عن المقذوفات في كل مكان
+    for _, proj in pairs(workspace:GetDescendants()) do
+        if proj:IsA("BasePart") and proj ~= rootPart and not proj:IsDescendantOf(character) then
+            -- شروط اعتبار الجزء مقذوفاً: له Velocity، غير مثبت، ليس جزءاً من لاعب آخر
+            if proj.Velocity and proj.Velocity.Magnitude > 20 and not proj.Anchored then
+                -- نتجنب إعادة توجيه نفس المقذوف عدة مرات (تحسين أداء)
+                if not trackedProjectiles[proj] then
+                    trackedProjectiles[proj] = true
+                    -- نستخدم تأخير بسيط لضمان أن المقذوف قد أطلق بالفعل
+                    task.spawn(function()
+                        task.wait(0.05)
+                        if proj and proj.Parent then
+                            redirectProjectile(proj, targetPos)
+                        end
+                        trackedProjectiles[proj] = nil
+                    end)
+                end
+            end
+        end
     end
 end)
 
--- ==================== التلبورت (الزر المنفصل) ====================
+-- زر تفعيل الميزة داخل القائمة
+homingBtn.MouseButton1Click:Connect(function()
+    homingEnabled = not homingEnabled
+    homingBtn.Text = homingEnabled and "ON" or "OFF"
+    homingBtn.BackgroundColor3 = homingEnabled and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 55)
+    if homingEnabled then
+        -- ننظف القائمة القديمة
+        trackedProjectiles = {}
+    end
+end)
+
+-- ==================== التلبورت (Teleport) ====================
 local teleportEnabled = false
 
 local function getTeleportPosition(target)
@@ -575,7 +579,22 @@ end
 
 local function performTeleport()
     if isTeleporting then return end
-    local target = getClosestTarget()
+    -- نبحث عن أقرب لاعب (مع تجاهل المتجاهلين)
+    local target = nil
+    local closestDist = 80
+    for _, plr in pairs(Players:GetPlayers()) do
+        if plr ~= player and not ignoredPlayers[plr.Name] and plr.Character then
+            local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                local dist = (rootPart.Position - hrp.Position).Magnitude
+                if dist < closestDist then
+                    closestDist = dist
+                    target = plr
+                end
+            end
+        end
+    end
+    
     if not target then
         tpFloatingBtn.Text = "❌"
         tpFloatingBtn.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
@@ -594,7 +613,7 @@ local function performTeleport()
     tpFloatingBtn.Text = "🔄"
     tpFloatingBtn.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
     
-    -- دورة حول اللاعب
+    -- دورة سريعة حول الخصم (لإرباكه)
     for ang = 0, 300, 60 do
         local rad = math.rad(ang)
         local offset = Vector3.new(math.cos(rad) * 2.2, 0, math.sin(rad) * 2.2)
@@ -628,26 +647,18 @@ tpFloatingBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- ==================== الحلقات الأساسية (تثبيت السرعة، القفز، تحديث ESP) ====================
--- تحديث السرعة والقفز كل إطار
+-- ==================== تثبيت السرعة والقفز بشكل دوري (لمقاومة إعادة الضبط) ====================
 RunService.Heartbeat:Connect(function()
     if speedEnabled then applySpeed() end
     if jumpEnabled then applyJump() end
 end)
 
--- تحديث ESP كل إطار (لحل مشكلة التجمّد)
-RunService.RenderStepped:Connect(function()
-    if espEnabled then
-        pcall(updateESP)
-    end
-end)
-
--- عند إعادة الولادة، نضمن استمرار السرعة والقفز
+-- عند إعادة الولادة، نضمن استمرارية السرعة والقفز
 player.CharacterAdded:Connect(function(newChar)
     character = newChar
     humanoid = character:WaitForChild("Humanoid")
     rootPart = character:WaitForChild("HumanoidRootPart")
-    task.wait(0.3)
+    task.wait(0.5)
     if speedEnabled then applySpeed() end
     if jumpEnabled then applyJump() end
 end)
@@ -660,4 +671,6 @@ toggleMenuBtn.MouseButton1Click:Connect(function()
     toggleMenuBtn.ImageColor3 = menuVisible and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
 end)
 
-print("🔥✅ DELTA 2026 V2 تم التحميل بنجاح! جميع الميزات تعمل وESP بدون تجمّد.")
+-- إشعار بالجاهزية
+print("🔥🔥🔥 DELTA 2026 V3 - ALL FEATURES ACTIVE 🔥🔥🔥")
+print("💥 Projectile Homing: bullets will seek nearest enemy when enabled.")
