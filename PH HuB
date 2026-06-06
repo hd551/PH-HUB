@@ -1,4 +1,4 @@
--- Phoenix Hub - نسخة الواجهة المدمجة الذاتية (إصلاح شامل للسرعة والهيت بوكس المستمر)
+-- Phoenix Hub - نسخة الواجهة المدمجة الذاتية (حل مشكلة السرعة الفردية والـ ZIndex للزر)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local UserInputService = game:GetService("UserInputService")
@@ -10,14 +10,22 @@ local TargetJump = 50
 local CustomSpeedEnabled = false
 local CustomJumpEnabled = false
 
--- لوب فائق السرعة (بين الفريمات) لتثبيت السرعة غصب عن السيرفر والماب
-RunService.Heartbeat:Connect(function()
+-- لوب فائق السرعة لتجاوز أنظمة الحركة المخصصة في المابات عبر الـ CFrame
+RunService.Heartbeat:Connect(function(deltaTime)
     pcall(function()
-        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
             local hum = LocalPlayer.Character.Humanoid
+            local hrp = LocalPlayer.Character.HumanoidRootPart
+            
             if CustomSpeedEnabled then
-                hum.WalkSpeed = TargetSpeed
+                hum.WalkSpeed = TargetSpeed -- محاولة التعديل العادي أولاً
+                -- إذا كان اللاعب يتحرك والسرعة المطلوبة أعلى من الطبيعية، يتم دفعه يدوياً لتجاوز حماية الماب
+                if hum.MoveDirection.Magnitude > 0 and TargetSpeed > 16 then
+                    local extraSpeed = TargetSpeed - 16
+                    hrp.CFrame = hrp.CFrame + (hum.MoveDirection * (extraSpeed * deltaTime))
+                end
             end
+            
             if CustomJumpEnabled then
                 hum.UseJumpPower = true
                 hum.JumpPower = TargetJump
@@ -32,7 +40,7 @@ ScreenGui.Name = "PhoenixHub_Instant"
 ScreenGui.Parent = game:GetService("CoreGui") or LocalPlayer:FindFirstChildOfClass("PlayerGui")
 ScreenGui.ResetOnSpawn = false
 
--- 2. تصميم الزر العائم (PH) القابل للسحب والتحريك
+-- 2. تصميم الزر العائم (PH) وجعله يظهر دائماً فوق القائمة (ZIndex أعلى)
 local ToggleButton = Instance.new("TextButton")
 local BtnCorner = Instance.new("UICorner")
 ToggleButton.Name = "ToggleButton"
@@ -46,10 +54,12 @@ ToggleButton.TextColor3 = Color3.fromRGB(0, 255, 130)
 ToggleButton.TextSize = 20
 ToggleButton.Active = true
 ToggleButton.Draggable = true
+ToggleButton.ZIndex = 10 -- يضمن ظهور الزر فوق اللوحة دائماً
+
 BtnCorner.CornerRadius = UDim.new(0, 28)
 BtnCorner.Parent = ToggleButton
 
--- 3. اللوحة الرئيسية للسكربت
+-- 3. اللوحة الرئيسية للسكربت (محفوظة بنفس الشكل تماماً)
 local MainFrame = Instance.new("Frame")
 local MainCorner = Instance.new("UICorner")
 MainFrame.Name = "MainFrame"
@@ -57,6 +67,7 @@ MainFrame.Parent = ScreenGui
 MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
 MainFrame.Position = UDim2.new(0.5, -175, 0.5, -130)
 MainFrame.Size = UDim2.new(0, 350, 0, 260)
+MainFrame.ZIndex = 1
 MainCorner.CornerRadius = UDim.new(0, 10)
 MainCorner.Parent = MainFrame
 
@@ -336,7 +347,7 @@ task.spawn(function()
 end)
 
 -----------------------------------------------------------------------------------------
--- [3. برمجة خانة القتال] - إصلاح فوري وشامل لثبات حجم الهيت بوكس عند الريسبون
+-- [3. برمجة خانة القتال]
 -----------------------------------------------------------------------------------------
 local HitboxSize = 2
 local HitboxEnabled = false
@@ -350,7 +361,6 @@ createToggle(CombatPage, "تفعيل تكبير الهيت بوكس", function(V
     HitboxEnabled = Value
 end)
 
--- نظام التحديث اللحظي (في كل فريم شاشة) لضمان ثبات الهيت بوكس ودعم اللاعبين الجدد
 RunService.Heartbeat:Connect(function()
     pcall(function()
         if HitboxEnabled then
@@ -358,7 +368,6 @@ RunService.Heartbeat:Connect(function()
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
                     local hrp = p.Character.HumanoidRootPart
-                    -- تعديل الحجم فوراً دون أي تأخير حتى لو رسبن اللاعب
                     hrp.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
                     hrp.Transparency = 0.7
                     hrp.BrickColor = BrickColor.new("Really blue")
@@ -366,7 +375,6 @@ RunService.Heartbeat:Connect(function()
                 end
             end
         elseif LastHitboxState then
-            -- تنظيف وإرجاع الكل للحجم الطبيعي عند إطفاء الميزة
             LastHitboxState = false
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
