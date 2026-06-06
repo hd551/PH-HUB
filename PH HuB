@@ -467,16 +467,15 @@ RunService.Heartbeat:Connect(function()
     if espOn then pcall(updateESP) end
 end)
 
-print("✅ الجزء 2/3 تم - انتقل للجزء الثالث (الأخير)")-- ============================================================
--- الجزء 3/3 – Homing (الزر السحري) + Teleport
--- ============================================================
+print("✅ الجزء 2/3 تم - انتقل للجزء الثالث (الأخير)")-- ===================================================================
+-- الجزء 3/3 – Homing (توجيه المقذوفات لأقرب لاعب) + Teleport
+-- ===================================================================
 
--- ==================== Homing: توجيه الرصاص / المقذوفات لأقرب لاعب ====================
+-- ==================== Homing: الرصاص يذهب إلى أقرب لاعب ====================
 local homingOn = false
-local trackedProjectiles = {}   -- لمنع إعادة التوجيه المتكرر
+local tracked = {}   -- لمنع إعادة التوجيه المتكرر لنفس المقذوف
 
--- دالة للحصول على موقع أقرب لاعب (هدف)
-local function getClosestEnemyPos()
+local function getClosestEnemyPosition()
     local bestPos = nil
     local bestDist = 200
     for _, plr in pairs(Players:GetPlayers()) do
@@ -494,49 +493,43 @@ local function getClosestEnemyPos()
     return bestPos
 end
 
--- وظيفة توجيه المقذوف (تغيير اتجاه السرعة)
 local function steerProjectile(proj, targetPos)
     if not proj or not proj.Parent then return end
     if proj:IsA("BasePart") and proj.Velocity then
         local dir = (targetPos - proj.Position).Unit
         local speed = proj.Velocity.Magnitude
-        if speed < 20 then speed = 100 end   -- سرعة افتراضية للمقذوفات البطيئة
+        if speed < 20 then speed = 100 end   -- سرعة افتراضية للقذائف البطيئة
         proj.Velocity = dir * speed
-        proj.CFrame = CFrame.new(proj.Position, targetPos)  -- لتوجيه المظهر أيضاً
+        proj.CFrame = CFrame.new(proj.Position, targetPos)
     end
 end
 
--- حلقة البحث عن المقذوفات (خفيفة جداً)
+-- البحث عن المقذوفات وتوجيهها (خفيف جداً)
 RunService.Heartbeat:Connect(function()
     if not homingOn then return end
-    local targetPos = getClosestEnemyPos()
+    local targetPos = getClosestEnemyPosition()
     if not targetPos then return end
-    
     for _, obj in pairs(workspace:GetDescendants()) do
         if obj:IsA("BasePart") and obj.Velocity and obj.Velocity.Magnitude > 30 then
-            -- نتأكد أن المقذوف ليس جزءاً من شخصيتنا ولا من لاعب آخر
-            if not obj:IsDescendantOf(character) and not trackedProjectiles[obj] then
-                trackedProjectiles[obj] = true
+            if not obj:IsDescendantOf(character) and not tracked[obj] then
+                tracked[obj] = true
                 task.spawn(function()
                     task.wait(0.05)  -- ننتظر قليلاً بعد الإطلاق
                     if obj and obj.Parent then
                         steerProjectile(obj, targetPos)
                     end
-                    trackedProjectiles[obj] = nil
+                    tracked[obj] = nil
                 end)
             end
         end
     end
 end)
 
--- زر تفعيل Homing (الزر المطلوب)
 homingBtn.MouseButton1Click:Connect(function()
     homingOn = not homingOn
     homingBtn.Text = homingOn and "ON" or "OFF"
     homingBtn.BackgroundColor3 = homingOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 55)
-    if not homingOn then
-        trackedProjectiles = {}
-    end
+    if not homingOn then tracked = {} end
 end)
 
 -- ==================== Teleport (زر منفصل) ====================
@@ -563,7 +556,6 @@ end
 local function getTeleportPosition(target)
     local char = target.Character
     if not char then return nil end
-    -- محاولة إيجاد اليد اليمنى أو الذراع
     local hand = char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm") or char:FindFirstChild("ArmR")
     if hand then return hand.Position end
     local head = char:FindFirstChild("Head")
@@ -577,22 +569,22 @@ local function doTeleport()
     if isTeleporting then return end
     local target = getNearestTeleportTarget()
     if not target then
-        tpFloat.Text = "❌"
-        tpFloat.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
+        tpButton.Text = "❌"
+        tpButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
         task.wait(0.6)
-        tpFloat.Text = "🔮\nTP"
-        tpFloat.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+        tpButton.Text = "🔮\nTP"
+        tpButton.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
         return
     end
     local pos = getTeleportPosition(target)
     if not pos then return end
-    
+
     isTeleporting = true
     savedPos = rootPart.CFrame
     rootPart.CFrame = CFrame.new(pos)
-    tpFloat.Text = "🔄"
-    tpFloat.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
-    
+    tpButton.Text = "🔄"
+    tpButton.BackgroundColor3 = Color3.fromRGB(200, 150, 0)
+
     -- دورة حول الخصم
     for ang = 0, 300, 60 do
         local rad = math.rad(ang)
@@ -600,27 +592,27 @@ local function doTeleport()
         pcall(function() rootPart.CFrame = CFrame.new(pos + offset, pos) end)
         task.wait(0.012)
     end
-    
-    tpFloat.Text = "📍"
-    tpFloat.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
+
+    tpButton.Text = "📍"
+    tpButton.BackgroundColor3 = Color3.fromRGB(0, 200, 0)
     task.wait(0.08)
     if savedPos then
         rootPart.CFrame = savedPos
         savedPos = nil
     end
-    tpFloat.Text = "🔮\nTP"
-    tpFloat.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
+    tpButton.Text = "🔮\nTP"
+    tpButton.BackgroundColor3 = Color3.fromRGB(25, 25, 35)
     isTeleporting = false
 end
 
-teleBtn.MouseButton1Click:Connect(function()
+teleportBtn.MouseButton1Click:Connect(function()
     teleOn = not teleOn
-    teleBtn.Text = teleOn and "ON" or "OFF"
-    teleBtn.BackgroundColor3 = teleOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 55)
-    tpFloat.Visible = teleOn
+    teleportBtn.Text = teleOn and "ON" or "OFF"
+    teleportBtn.BackgroundColor3 = teleOn and Color3.fromRGB(0, 200, 0) or Color3.fromRGB(40, 40, 55)
+    tpButton.Visible = teleOn
 end)
 
-tpFloat.MouseButton1Click:Connect(function()
+tpButton.MouseButton1Click:Connect(function()
     if teleOn and not isTeleporting then
         doTeleport()
     end
@@ -640,6 +632,8 @@ player.CharacterAdded:Connect(function(newChar)
     humanoid = character:WaitForChild("Humanoid")
     rootPart = character:WaitForChild("HumanoidRootPart")
     task.wait(0.5)
-    if speedOn then setSpeed() end
-    if jumpOn then setJump() end
+    if speedOn then applySpeed() end
+    if jumpOn then applyJump() end
 end)
+
+-- ==================== إشعار النجاح ====================
