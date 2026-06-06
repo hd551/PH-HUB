@@ -1,7 +1,8 @@
--- Phoenix Hub - نسخة الواجهة المدمجة الذاتية (المطورة والمصلحة بالكامل)
+-- Phoenix Hub - نسخة الواجهة المدمجة الذاتية (إصلاح شامل للسرعة والهيت بوكس المستمر)
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
 -- متغيرات التحكم بالسرعة المستمرة لضمان عملها في أي ماب
 local TargetSpeed = 16
@@ -9,21 +10,20 @@ local TargetJump = 50
 local CustomSpeedEnabled = false
 local CustomJumpEnabled = false
 
-task.spawn(function()
-    while task.wait() do
-        pcall(function()
-            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
-                local hum = LocalPlayer.Character.Humanoid
-                if CustomSpeedEnabled then
-                    hum.WalkSpeed = TargetSpeed
-                end
-                if CustomJumpEnabled then
-                    hum.UseJumpPower = true
-                    hum.JumpPower = TargetJump
-                end
+-- لوب فائق السرعة (بين الفريمات) لتثبيت السرعة غصب عن السيرفر والماب
+RunService.Heartbeat:Connect(function()
+    pcall(function()
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            local hum = LocalPlayer.Character.Humanoid
+            if CustomSpeedEnabled then
+                hum.WalkSpeed = TargetSpeed
             end
-        end)
-    end
+            if CustomJumpEnabled then
+                hum.UseJumpPower = true
+                hum.JumpPower = TargetJump
+            end
+        end
+    end)
 end)
 
 -- 1. إنشاء الـ GUI الأساسي وحفظه في مكان آمن بالجوال
@@ -232,7 +232,7 @@ local function createButton(parent, text, callback)
 end
 
 -----------------------------------------------------------------------------------------
--- [1. برمجة خانة الحركة] - مصلحة ومعدلة لتجبر القيمة في الخلفية دائماً
+-- [1. برمجة خانة الحركة]
 -----------------------------------------------------------------------------------------
 createTextbox(MovePage, "تعديل السرعة (Speed)", "16", function(Value)
     local num = tonumber(Value)
@@ -266,7 +266,7 @@ UserInputService.JumpRequest:Connect(function()
 end)
 
 -----------------------------------------------------------------------------------------
--- [2. برمجة خانة الرؤية ESP] - تم إصلاح كاشف الساقطات ليدعم الـ Tools وأي Drop
+-- [2. برمجة خانة الرؤية ESP]
 -----------------------------------------------------------------------------------------
 local PlayerESPEnabled = false
 createToggle(VisPage, "كشف اللاعبين (Player ESP)", function(Value)
@@ -316,7 +316,6 @@ task.spawn(function()
         if ChestESPEnabled then
             for _, v in pairs(workspace:GetDescendants()) do
                 pcall(function()
-                    -- فحص الأدوات المرمية في الأرض أو أي مجسمات الصناديق والفواكه
                     local isDroppedItem = v:IsA("Tool") and v.Parent == workspace
                     local isTargetPart = v:IsA("BasePart") and (v.Name:lower():find("chest") or v.Name:lower():find("box") or v.Name:lower():find("tool") or v.Name:lower():find("drop") or v.Name:lower():find("fruit"))
                     
@@ -337,10 +336,11 @@ task.spawn(function()
 end)
 
 -----------------------------------------------------------------------------------------
--- [3. برمجة خانة القتال والميزات الإضافية]
+-- [3. برمجة خانة القتال] - إصلاح فوري وشامل لثبات حجم الهيت بوكس عند الريسبون
 -----------------------------------------------------------------------------------------
 local HitboxSize = 2
 local HitboxEnabled = false
+local LastHitboxState = false
 
 createTextbox(CombatPage, "حجم الهيت بوكس (Size)", "2", function(Value)
     HitboxSize = tonumber(Value) or 2
@@ -350,28 +350,34 @@ createToggle(CombatPage, "تفعيل تكبير الهيت بوكس", function(V
     HitboxEnabled = Value
 end)
 
-task.spawn(function()
-    while task.wait(1) do
+-- نظام التحديث اللحظي (في كل فريم شاشة) لضمان ثبات الهيت بوكس ودعم اللاعبين الجدد
+RunService.Heartbeat:Connect(function()
+    pcall(function()
         if HitboxEnabled then
+            LastHitboxState = true
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                    p.Character.HumanoidRootPart.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
-                    p.Character.HumanoidRootPart.Transparency = 0.7
-                    p.Character.HumanoidRootPart.BrickColor = BrickColor.new("Really blue")
-                    p.Character.Humanename = "RootHitbox"
-                    p.Character.HumanoidRootPart.CanCollide = false
+                    local hrp = p.Character.HumanoidRootPart
+                    -- تعديل الحجم فوراً دون أي تأخير حتى لو رسبن اللاعب
+                    hrp.Size = Vector3.new(HitboxSize, HitboxSize, HitboxSize)
+                    hrp.Transparency = 0.7
+                    hrp.BrickColor = BrickColor.new("Really blue")
+                    hrp.CanCollide = false
                 end
             end
-        else
+        elseif LastHitboxState then
+            -- تنظيف وإرجاع الكل للحجم الطبيعي عند إطفاء الميزة
+            LastHitboxState = false
             for _, p in pairs(Players:GetPlayers()) do
                 if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                    p.Character.HumanoidRootPart.Size = Vector3.new(2, 2, 2)
-                    p.Character.HumanoidRootPart.Transparency = 1
-                    p.Character.HumanoidRootPart.CanCollide = true
+                    local hrp = p.Character.HumanoidRootPart
+                    hrp.Size = Vector3.new(2, 2, 2)
+                    hrp.Transparency = 1
+                    hrp.CanCollide = true
                 end
             end
         end
-    end
+    end)
 end)
 
 createButton(CombatPage, "تفعيل منع الطرد (Anti-AFK)", function()
